@@ -1,9 +1,14 @@
+
 import { Types, createComponent, createSystem, Entity } from "@iwsdk/core";
 import { NewSparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { GaussianSplatAnimator } from "./gaussianSplatAnimator.js";
 
+
+// ------------------------------------------------------------
+// Constants & Types
+// ------------------------------------------------------------
 const LOAD_TIMEOUT_MS = 30_000;
 
 interface SplatInstance {
@@ -12,6 +17,10 @@ interface SplatInstance {
   animator: GaussianSplatAnimator | null;
 }
 
+
+// ------------------------------------------------------------
+// Component – marks an entity as a Gaussian Splat host
+// ------------------------------------------------------------
 /**
  * Marks an entity as a Gaussian Splat host. Attach to any entity with an
  * `object3D`; the system will load the splat (and optional collider) as
@@ -26,6 +35,10 @@ export const GaussianSplatLoader = createComponent("GaussianSplatLoader", {
   lodSplatScale: { type: Types.Float32, default: 1.0 },
 });
 
+
+// ------------------------------------------------------------
+// System – loads, unloads, and animates Gaussian Splats
+// ------------------------------------------------------------
 /**
  * Manages loading, unloading, and animation of Gaussian Splats for entities
  * that carry {@link GaussianSplatLoader}. Auto-loads when `autoLoad` is true;
@@ -34,11 +47,19 @@ export const GaussianSplatLoader = createComponent("GaussianSplatLoader", {
 export class GaussianSplatLoaderSystem extends createSystem({
   splats: { required: [GaussianSplatLoader] },
 }) {
+
+  // ----------------------------------------------------------
+  // State
+  // ----------------------------------------------------------
   private instances = new Map<number, SplatInstance>();
   private animating = new Set<number>();
   private gltfLoader = new GLTFLoader();
   private sparkRenderer: NewSparkRenderer | null = null;
 
+
+  // ----------------------------------------------------------
+  // Initialization
+  // ----------------------------------------------------------
   init() {
     const spark = new NewSparkRenderer({
       renderer: this.world.renderer,
@@ -82,6 +103,10 @@ export class GaussianSplatLoaderSystem extends createSystem({
     });
   }
 
+
+  // ----------------------------------------------------------
+  // Frame Loop
+  // ----------------------------------------------------------
   update() {
     if (this.animating.size === 0) return;
 
@@ -98,7 +123,10 @@ export class GaussianSplatLoaderSystem extends createSystem({
     }
   }
 
-  /** Load the splat (and optional collider mesh) for an entity. */
+
+  // ----------------------------------------------------------
+  // Load – fetch the .spz splat (and optional collider mesh)
+  // ----------------------------------------------------------
   async load(
     entity: Entity,
     options?: { animate?: boolean },
@@ -186,7 +214,10 @@ export class GaussianSplatLoaderSystem extends createSystem({
     }
   }
 
-  /** Replay fly-in animation for an already-loaded entity. */
+
+  // ----------------------------------------------------------
+  // Replay – restart the fly-in animation on an existing splat
+  // ----------------------------------------------------------
   async replayAnimation(
     entity: Entity,
     options?: { duration?: number },
@@ -200,7 +231,10 @@ export class GaussianSplatLoaderSystem extends createSystem({
     await instance.animator.animateIn(options?.duration);
   }
 
-  /** Unload the splat (and collider) for an entity. */
+
+  // ----------------------------------------------------------
+  // Unload – remove the splat (and collider) from the scene
+  // ----------------------------------------------------------
   async unload(
     entity: Entity,
     options?: { animate?: boolean },
@@ -220,6 +254,10 @@ export class GaussianSplatLoaderSystem extends createSystem({
     this.removeInstance(entity.index);
   }
 
+
+  // ----------------------------------------------------------
+  // Cleanup – dispose GPU resources and detach from the scene
+  // ----------------------------------------------------------
   private removeInstance(entityIndex: number): void {
     const instance = this.instances.get(entityIndex);
     if (!instance) return;

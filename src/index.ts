@@ -1,3 +1,5 @@
+
+import * as THREE from "three";
 import {
   EnvironmentType,
   Interactable,
@@ -11,19 +13,23 @@ import {
   VisibilityState,
   World,
 } from "@iwsdk/core";
-import * as THREE from "three";
-import { PanelSystem } from "./panel.js";
-import {
-  GaussianSplatLoader,
-  GaussianSplatLoaderSystem,
-} from "./gaussianSplatLoader.js";
+import { PanelSystem } from "./uiPanel.js";
+import { GaussianSplatLoader, GaussianSplatLoaderSystem,} from "./gaussianSplatLoader.js";
+import { spawnHologramSphere } from "./interactableExample.js";
 
+
+// ------------------------------------------------------------
+// World (IWSDK settings)
+// ------------------------------------------------------------
 World.create(document.getElementById("scene-container") as HTMLDivElement, {
   assets: {},
   xr: {
     sessionMode: SessionMode.ImmersiveVR,
     offer: "always",
     features: { handTracking: true, layers: true },
+  },
+  render: {
+    defaultLighting: false,
   },
   features: {
     locomotion: true,
@@ -34,8 +40,35 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 })
   .then((world) => {
     world.camera.position.set(0, 1.5, 0);
+    world.scene.background = new THREE.Color(0x000000);
+    world.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
+    world
+      .registerSystem(PanelSystem)
+      .registerSystem(GaussianSplatLoaderSystem);
+
+
+    // ------------------------------------------------------------
+    // Gaussian Splat
+    // ------------------------------------------------------------
+    const splatEntity = world.createTransformEntity();
+    splatEntity.addComponent(GaussianSplatLoader);
+
+    const splatSystem = world.getSystem(GaussianSplatLoaderSystem)!;
+
+    // Play splat animation when entering XR
+    world.visibilityState.subscribe((state) => {
+      if (state !== VisibilityState.NonImmersive) {
+        splatSystem.replayAnimation(splatEntity).catch((err) => {
+          console.error("[World] Failed to replay splat animation:", err);
+        });
+      }
+    });
+
+    
+    // ------------------------------------------------------------
     // Invisible floor for locomotion (must be a Mesh for IWSDK raycasting)
+    // ------------------------------------------------------------
     const floorGeometry = new PlaneGeometry(100, 100);
     floorGeometry.rotateX(-Math.PI / 2);
     const floor = new Mesh(floorGeometry, new MeshBasicMaterial());
@@ -49,12 +82,16 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     grid.material.opacity = 0.4;
     world.scene.add(grid);
 
-    // Systems must be registered before entities that use their components
-    world
-      .registerSystem(PanelSystem)
-      .registerSystem(GaussianSplatLoaderSystem);
 
+    // ------------------------------------------------------------
+    // Hologram Sphere (distance-grabbable, translate in place)
+    // ------------------------------------------------------------
+    spawnHologramSphere(world);
+
+
+    // ------------------------------------------------------------
     // Panel UI (centered on screen in desktop, positioned in 3D for XR)
+    // ------------------------------------------------------------
     const panelEntity = world
       .createTransformEntity()
       .addComponent(PanelUI, {
@@ -73,25 +110,10 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       });
     panelEntity.object3D!.position.set(0, 1.29, -1.9);
 
-    // Gaussian Splat (loads immediately, fly-in animation plays on XR enter)
-    const splatEntity = world.createTransformEntity();
-    splatEntity.addComponent(GaussianSplatLoader);
-
-    const splatSystem = world.getSystem(GaussianSplatLoaderSystem)!;
-    world.visibilityState.subscribe((state) => {
-      if (state !== VisibilityState.NonImmersive) {
-        splatSystem.replayAnimation(splatEntity).catch((err) => {
-          console.error("[World] Failed to replay splat animation:", err);
-        });
-      }
-    });
   })
   .catch((err) => {
     console.error("[World] Failed to create the IWSDK world:", err);
     const container = document.getElementById("scene-container");
-    if (container) {
-      container.innerHTML =
-        '<p style="color:red;padding:2rem;font-family:sans-serif">' +
-        "Failed to initialize the scene. Check the console for details.</p>";
-    }
   });
+
+  

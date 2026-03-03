@@ -1,4 +1,10 @@
+
 import { SplatMesh, dyno } from "@sparkjsdev/spark";
+
+
+// ------------------------------------------------------------
+// Constants & Config
+// ------------------------------------------------------------
 
 /** Default fly-in / fly-out duration in seconds. */
 export const DEFAULT_ANIMATION_DURATION = 1.5;
@@ -10,6 +16,11 @@ export interface SplatAnimationOptions {
   /** Per-splat stagger spread (0–1). */
   spread?: number;
 }
+
+
+// ------------------------------------------------------------
+// Animator – GPU-accelerated fly-in / fly-out for SplatMesh
+// ------------------------------------------------------------
 
 /**
  * GPU-accelerated fly-in / fly-out animation for a `SplatMesh`.
@@ -29,6 +40,11 @@ export interface SplatAnimationOptions {
  * Call `tick()` every frame from the owning system's `update()`.
  */
 export class GaussianSplatAnimator {
+
+  // ----------------------------------------------------------
+  // State
+  // ----------------------------------------------------------
+
   readonly splat: SplatMesh;
   duration: number;
 
@@ -44,6 +60,11 @@ export class GaussianSplatAnimator {
   private activeDuration = 0;
   private resolveAnimation: (() => void) | null = null;
 
+
+  // ----------------------------------------------------------
+  // Constructor
+  // ----------------------------------------------------------
+
   constructor(splat: SplatMesh, options?: SplatAnimationOptions) {
     this.splat = splat;
     this.duration = options?.duration ?? DEFAULT_ANIMATION_DURATION;
@@ -51,11 +72,20 @@ export class GaussianSplatAnimator {
     this.flyInProgress = dyno.dynoFloat(0.0);
   }
 
-  /** Attach the fly-in modifier and recompile. Call after splat has loaded. */
+
+  // ----------------------------------------------------------
+  // Shader Setup – attach the fly-in modifier & recompile
+  // ----------------------------------------------------------
+
   apply(): void {
     this.splat.objectModifier = this.createFlyInModifier();
     this.splat.updateGenerator();
   }
+
+
+  // ----------------------------------------------------------
+  // Animation Controls – fly-in, fly-out, stop, dispose
+  // ----------------------------------------------------------
 
   animateIn(duration?: number): Promise<void> {
     return this.start("in", duration ?? this.duration);
@@ -65,7 +95,25 @@ export class GaussianSplatAnimator {
     return this.start("out", duration ?? this.duration);
   }
 
-  /** Advance animation by one frame. */
+  stop(): void {
+    if (!this._animating) return;
+    this._animating = false;
+    if (this.resolveAnimation) {
+      const resolve = this.resolveAnimation;
+      this.resolveAnimation = null;
+      resolve();
+    }
+  }
+
+  dispose(): void {
+    this.stop();
+  }
+
+
+  // ----------------------------------------------------------
+  // Frame Tick – advance the progress uniform each frame
+  // ----------------------------------------------------------
+
   tick(): void {
     if (!this._animating) return;
 
@@ -85,6 +133,11 @@ export class GaussianSplatAnimator {
     }
   }
 
+
+  // ----------------------------------------------------------
+  // Manual Progress – set or read the animation progress (0–1)
+  // ----------------------------------------------------------
+
   /** Set progress directly (0 = origin, 1 = final position). */
   setProgress(value: number): void {
     this.flyInProgress.value = Math.max(0, Math.min(1, value));
@@ -95,19 +148,10 @@ export class GaussianSplatAnimator {
     return this.flyInProgress.value;
   }
 
-  stop(): void {
-    if (!this._animating) return;
-    this._animating = false;
-    if (this.resolveAnimation) {
-      const resolve = this.resolveAnimation;
-      this.resolveAnimation = null;
-      resolve();
-    }
-  }
 
-  dispose(): void {
-    this.stop();
-  }
+  // ----------------------------------------------------------
+  // Internal – start helper
+  // ----------------------------------------------------------
 
   private start(direction: "in" | "out", duration: number): Promise<void> {
     this.stop();
@@ -120,8 +164,13 @@ export class GaussianSplatAnimator {
     });
   }
 
+
+  // ----------------------------------------------------------
+  // GPU Modifier (GLSL) – per-splat rise, turbulence, scale pop
+  // ----------------------------------------------------------
+
   /**
-   * GPU modifier: each splat rises from 2 m below with staggered timing,
+   * Each splat rises from 2 m below with staggered timing,
    * layered turbulence, scale pop (30 % -> 100 %), and opacity fade.
    */
   private createFlyInModifier() {
