@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+.DS_Store
+
+# Image tiles (large, tracked separately)
+tiles_present/
+tiles_past/
+tiles_future/
+ref_images/
+panoramas/
+*.png
+*.jpg
