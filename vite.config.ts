@@ -1,8 +1,8 @@
 import path from "path";
 import { injectIWER } from "@iwsdk/vite-plugin-iwer";
 import { compileUIKit } from "@iwsdk/vite-plugin-uikitml";
+import fs from "fs";
 import { defineConfig, type Plugin } from "vite";
-import mkcert from "vite-plugin-mkcert";
 
 // Uncomment the import below and add optimizeGLTF() to the plugins array
 // when you place GLTF/GLB files in public/gltf/:
@@ -41,7 +41,7 @@ function deduplicateThree(): Plugin {
 export default defineConfig({
   plugins: [
     deduplicateThree(),
-    // mkcert(), // disabled — run `mkcert -install` manually if HTTPS is needed
+    // mkcert() replaced by manual certs below
     injectIWER({
       device: "metaQuest3",
       activation: "localhost",
@@ -55,7 +55,15 @@ export default defineConfig({
     },
     dedupe: ["three"],
   },
-  server: { host: "0.0.0.0", port: 8081, open: true },
+  server: {
+    host: "0.0.0.0",
+    port: 8081,
+    open: true,
+    https: {
+      key: fs.readFileSync(path.resolve(__dirname, ".key.pem")),
+      cert: fs.readFileSync(path.resolve(__dirname, ".cert.pem")),
+    },
+  },
   build: {
     outDir: "dist",
     sourcemap: process.env.NODE_ENV !== "production",
