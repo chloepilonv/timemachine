@@ -203,6 +203,10 @@ behindFoveate: 0.1,
 outsideFoveate: 0.3,
 ```
 
+## TODO
+
+- [ ] Improve past & future splat quality — currently noticeably fuzzier than present due to lower-resolution input tiles from Gemini's image editing. See [IMPROVEMENTS.md](IMPROVEMENTS.md) for fix options.
+
 ## Related
 
 - [timemachine](https://github.com/chloepilonv/timemachine) — Pipeline that generates the source tiles and World Labs worlds from Google Street View
