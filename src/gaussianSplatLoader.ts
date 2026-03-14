@@ -64,10 +64,10 @@ export class GaussianSplatLoaderSystem extends createSystem({
     const spark = new SparkRenderer({
       renderer: this.world.renderer,
       enableLod: true,
-      lodSplatScale: 1.0,
-      behindFoveate: 0.1,
+      lodSplatScale: 2.0,
+      behindFoveate: 1.0,
     });
-    spark.outsideFoveate = 0.3;
+    spark.outsideFoveate = 1.0;
     spark.renderOrder = -10;
     this.world.scene.add(spark);
     this.sparkRenderer = spark;

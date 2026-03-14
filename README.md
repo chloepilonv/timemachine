@@ -1,115 +1,165 @@
-# sensai-webxr-worldmodels
+# Time Machine WebXR
 
-Template project for building WebXR worldmodel experiences with IWSDK, SparkJS Gaussian splats, and spatial UI.
+Travel through time at the San Francisco Ferry Building — explore the same location in the 1920s, present day, and a speculative future, all in immersive WebXR.
 
-<img src="./assets/rm_sensai_webxr_hero.gif" width="800" alt="WebXR worldmodels hero" />
+Built for Pico headsets. Also works in any WebXR-capable browser with the included headset simulator.
 
-## Getting Started
-Prerequisites: Node `>=20.19.0`, a WebXR-capable browser, and an optional headset for immersive testing.
+## How It Works
 
-Install and run:
+Three Gaussian splat worlds (generated via [World Labs Marble](https://marble.worldlabs.ai/)) are loaded into a WebXR scene using [SparkJS](https://sparkjs.dev/) and [IWSDK](https://elixrjs.io/). A spatial UI panel lets you switch between eras with animated fly-in/fly-out transitions.
+
+| Era | Description |
+|-----|-------------|
+| **1920s** | Cobblestone streets, Model Ts, gas lamps, hand-painted storefronts |
+| **Present** | San Francisco Ferry Building as it looks today |
+| **Future** | Flying vehicles, holographic displays, vertical gardens, smart roads |
+
+## Prerequisites
+
+- Node.js >= 20.19.0
+- Splat assets (see [Asset Setup](#asset-setup) below)
+
+## Quick Start
 
 ```bash
+git clone git@github.com:chloepilonv/timemachine_webxr.git
+cd timemachine_webxr
 npm install
+```
+
+### Asset Setup
+
+The Gaussian splat files are too large for git (~20-30 MB each). You need to download them into `public/splats/` before running.
+
+**Option A — Download from World Labs Marble:**
+
+1. Open each world in your browser:
+   - **Present**: https://marble.worldlabs.ai/world/11223fe8-f431-41d6-9fe2-9bc277ddab0c
+   - **Past (1920s)**: https://marble.worldlabs.ai/world/ed9e8428-e599-482c-a4c9-d77abb834d96
+   - **Future**: https://marble.worldlabs.ai/world/5b917cba-1247-4287-8613-5a199e74d7da
+2. Click the download/export button on each world with these settings:
+   - Splat file format: **SPZ**
+   - Coordinate system: **OpenGL**
+   - Plane level: **Ground level**
+   - High-quality mesh type: **Textured**
+3. Rename and move the files:
+
+```bash
+cp "San Francisco Ferry Building Scene.spz" public/splats/present.spz
+cp "San Francisco Ferry Building Scene_collider.glb" public/splats/present-collider.glb
+cp "Historic City Street Clock Tower.spz" public/splats/past.spz
+cp "Futuristic San Francisco Plaza.spz" public/splats/future.spz
+```
+
+**Option B — Download via World Labs API:**
+
+If you have a `WORLDLABS_API_KEY`, the splats are available at these CDN URLs:
+
+```
+# Past (1920s) — full res
+https://cdn.marble.worldlabs.ai/ed9e8428-e599-482c-a4c9-d77abb834d96/4b70b592-b865-43cd-8b09-b0dc1d347eb2_sand.spz
+
+# Future — full res
+https://cdn.marble.worldlabs.ai/5b917cba-1247-4287-8613-5a199e74d7da/d543f87c-07d1-41e7-8f07-db10b72466db_sand.spz
+```
+
+```bash
+curl -L -o public/splats/past.spz "<past_url>"
+curl -L -o public/splats/future.spz "<future_url>"
+```
+
+### Run
+
+```bash
 npm run dev
 ```
 
-### How to Add Your Own Splat
+Opens at `http://localhost:8081/`. The IWSDK headset simulator is injected automatically on localhost — use the virtual controllers to look around and interact.
 
-1. Attach `GaussianSplatLoader` to an entity (already done in `src/index.ts`).
-2. Set `splatUrl` to your local or remote `.spz`/`.ply`.
-3. Optionally set `meshUrl` to a `.gltf/.glb` collision mesh.
-4. Keep large splat files outside the repo (for example in object storage) and load via URL.
+### Expected file structure
 
-## SensAI Helpers
-
-### Gaussian Splat Loader
-- Loads and unloads local or remote `.spz`/`.ply` splats as children of an entity transform.
-- Supports optional collider loading through `meshUrl` (`GLTFLoader`) for locomotion hit testing.
-- Includes timeout-based loading and explicit error propagation.
-- API surface:
-  - Component props: `splatUrl`, `meshUrl`, `autoLoad`, `animate`, `enableLod`, `lodSplatScale`
-  - System methods: `load(entity, { animate? })`, `unload(entity, { animate? })`, `replayAnimation(entity, { duration? })`
-- Typical usage: add `GaussianSplatLoader` to an entity, set URLs, then let `autoLoad` handle startup or call system methods for runtime swaps.
-
-### Gaussian Splat Animator
-<img src="./assets/rm_sensai_splatanimation.gif" width="800" alt="Splat fly-in animation" />
-- GPU-accelerated fly-in/fly-out effect powered by SparkJS `dyno`.
-- Animates per-splat position, turbulence, scale, and opacity while CPU updates only a progress uniform.
-
-
-## Worldmodels
-- Uses `.spz` or `.ply` worldmodel assets.
-- Position, scale, and pivot are controlled by the hosting entity transform.
-- Runtime loading is handled by `GaussianSplatLoader`.
-
-### Marble (WorldLabs)
-- World Labs Marble outputs can be exported as Gaussian splats and used as source assets.
-- For interaction and locomotion, pair splats with a separate collision mesh.
-- If using remote-generated assets, integrate your own fetch/API flow before assigning `splatUrl`.
-- Host large splat files outside the repository (object storage/CDN is recommended).
-
-### SparkJS
-- Open-source Gaussian splat renderer from the World Labs team: https://sparkjs.dev/
-- Provides performant Gaussian splat rendering for WebGL2/WebXR in Three.js-based scenes.
-- This project uses **SparkJS 2.0 preview** with Level-of-Detail (LoD) enabled.
-
-***Level of Detail (LoD)***
-- LoD automatically adjusts splat quality based on distance: nearby areas render at full detail while distant areas use fewer, coarser splats.
-- This keeps frame rate stable on resource-constrained devices (Quest, PICO) by maintaining a fixed rendering budget instead of always rendering every splat.
-- LoD is enabled by default on the `GaussianSplatLoader` component (`enableLod: true`). Adjust `lodSplatScale` to trade quality for performance (lower = faster, higher = sharper).
-- **Runtime LoD (default):** Point `splatUrl` at any `.spz` file. The LoD tree is computed in-browser on load (~4s for 500K splats). No extra tooling needed.
-- **Pre-built LoD (faster startup):** Bake the LoD tree offline so the browser skips the computation. Clone the [SparkJS repo](https://github.com/sparkjsdev/spark/tree/v2.0.0-preview), build the Rust CLI, and run:
-
-```bash
-cargo build --manifest-path rust/build-lod/Cargo.toml --release
-./rust/target/release/build-lod --spz your-splat.spz
-# produces your-splat-lod.spz
+```
+public/splats/
+  present.spz            # ~29 MB
+  present-collider.glb   # ~3 MB (collision mesh for locomotion)
+  past.spz               # ~21 MB
+  future.spz             # ~21 MB
 ```
 
-***Three.js Version & Compatibility***
-- This project uses `super-three@0.181.0` (Three.js r181), upgraded from r177 to support SparkJS 2.0.
-- IWSDK externalizes its Three.js dependency, so it automatically uses the project's version. A custom Vite plugin (`deduplicateThree` in `vite.config.ts`) redirects IWSDK's bundled r177 imports to the project's single r181 instance, preventing duplicate Three.js modules.
-- A camera clone patch in `gaussianSplatLoader.ts` prevents a per-frame crash caused by SparkJS's LoD system deep-cloning IWSDK's non-clonable UI objects.
-- **These workarounds are temporary.** IWSDK has already [migrated to r181 on GitHub](https://github.com/facebook/immersive-web-sdk/commit/7317fdb) (Dec 2025) but has not published a new npm release since v0.2.2 (Nov 2025). Once the next IWSDK version ships, the Vite dedup plugin can be removed. The camera clone patch remains needed until SparkJS changes its `driveLod` behavior.
+## Pico Headset Testing
 
+1. Connect your Pico to the same WiFi network as your dev machine
+2. WebXR requires HTTPS on non-localhost. Either:
+   - Run `mkcert -install` then re-enable `mkcert()` in `vite.config.ts`
+   - Or deploy to Cloudflare Pages (see [Deployment](#deployment))
+3. Open `https://<your-local-ip>:8081/` in the Pico browser
+4. Tap **Enter XR** to launch immersive mode
 
-## IWSDK 
-IWSDK (Immersive Web SDK) is a WebXR-focused ECS framework for building interactive 3D/XR apps with built-in systems such as locomotion, grabbing, spatial UI, and XR session management.
-see https://elixrjs.io/
+## Controls
 
-### Headset simulator
-<img src="./assets/rm_sensai_headsetsimulator.png" width="800" alt="Headset simulator" />
-How to use
+- **<< Past / Future >>** — cycle through eras
+- **1920s / Present / Future** — jump directly to an era
+- **Enter XR** — launch immersive VR mode
+- **Teleport** — point and click to move (locomotion via invisible floor plane)
+- **Grab** — grab and move objects with controllers or hand tracking
 
-- The project enables the IWSDK local simulator via `@iwsdk/vite-plugin-iwer` in `vite.config.ts`.
-- Run `npm run dev` on localhost, open the app in a desktop browser, and use the injected simulator controls to emulate headset/controller behavior during iteration.
+## Deployment
 
-### UI
-see https://iwsdk.dev/guides/10-spatial-ui-uikitml.html
-The default render order can conflict with splat rendering, so this template applies a render-order/depth configuration to keep IWSDK UI above splats.
-Pointer depth behavior is also handled so panel interaction remains reliable.
+Build and deploy the static output to any CDN/host:
 
-### Interactions and Locomotion 
+```bash
+npm run build
+# deploy dist/ to Cloudflare Pages, Vercel, Netlify, etc.
+```
 
-- Built-in interactions such as one-/two-hand grab and distance grab:
-  https://iwsdk.dev/guides/06-built-in-interactions.html
-- Locomotion concepts (teleport, slide/smooth locomotion, turn):
-  https://iwsdk.dev/concepts/locomotion/
-- This template enables locomotion and grabbing in `World.create(...)`.
+Make sure your splat files are included in the `dist/` output (they're copied from `public/` during build).
 
-### Spatial Editor
-<img src="./assets/rm_sensai_metaspatial.png" width="800" alt="Metaspatial editor" />
-- Disabled by default.
-- Add it if your workflow requires in-world authoring or frequent scene adjustments during development.
+## Project Structure
 
-## Testing and Deployment
-- Build/deploy basics: https://elixrjs.io/guides/08-build-deploy.html
-- Local testing: `npm run dev`
-- Preview production build locally: `npm run build && npm run preview`
-- ***recommended deployment workflow***: deploy static build output (`dist/`) on Cloudflare.
+```
+timemachine_webxr/
+├── public/splats/           # Gaussian splat assets (gitignored)
+├── ui/
+│   └── timemachine.uikitml  # Spatial UI panel layout
+├── src/
+│   ├── index.ts             # Main entry — world setup, camera, floor, UI
+│   ├── worlds.ts            # Era definitions (past/present/future URLs)
+│   ├── timeMachineSystem.ts # ECS system for switching between eras
+│   ├── uiPanel.ts           # UI panel system — buttons, era display, XR toggle
+│   ├── gaussianSplatLoader.ts  # SparkJS splat loading/unloading/animation
+│   └── gaussianSplatAnimator.ts # GPU-accelerated fly-in/fly-out effects
+├── vite.config.ts           # Vite + IWSDK plugins
+└── package.json
+```
 
-## Acknowledgements & Credits 
-This project was created as part of the SensAI Hack(https://sensaihack.com/) - Worlds in Action. 
+## Built With
 
-Powered by SensAI Hackademy (https://sensaihackademy.com/).
+- [IWSDK](https://elixrjs.io/) — WebXR ECS framework (locomotion, grabbing, spatial UI)
+- [SparkJS 2.0](https://sparkjs.dev/) — Gaussian splat renderer for WebGL2/WebXR
+- [World Labs Marble](https://marble.worldlabs.ai/) — AI-generated 3D worlds from images
+- [Vite](https://vite.dev/) — build tooling
+
+## Performance Tuning
+
+SparkJS quality settings are in `src/gaussianSplatLoader.ts`:
+
+```ts
+const spark = new SparkRenderer({
+  lodSplatScale: 2.0,    // higher = more splats rendered (sharper)
+  behindFoveate: 1.0,    // 1.0 = full quality everywhere
+});
+spark.outsideFoveate = 1.0;
+```
+
+For Pico headsets, you may want to lower these for smoother frame rates:
+
+```ts
+lodSplatScale: 1.0,
+behindFoveate: 0.1,
+outsideFoveate: 0.3,
+```
+
+## Related
+
+- [timemachine](https://github.com/chloepilonv/timemachine) — Pipeline that generates the source tiles and World Labs worlds from Google Street View
+- [sensai-webxr-worldmodels](https://github.com/V4C38/sensai-webxr-worldmodels) — Original template this project is built on
