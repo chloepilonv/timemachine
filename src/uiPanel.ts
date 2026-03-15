@@ -11,7 +11,6 @@ import {
 import * as THREE from "three";
 import { Era, WORLDS } from "./worlds.js";
 import { TimeMachineSystem } from "./timeMachineSystem.js";
-import { convaiAgent } from "./convaiAgent.js";
 import { GaussianSplatLoaderSystem } from "./gaussianSplatLoader.js";
 
 // Render UI on top of splats using AlwaysDepth + high renderOrder.
@@ -130,15 +129,20 @@ export class PanelSystem extends createSystem({
         const splatSystem = this.world.getSystem(GaussianSplatLoaderSystem);
         const talkButton = document.getElementById("talk-button") as UIKit.Text;
         if (talkButton) {
-          talkButton.addEventListener("click", () => {
-            if (!convaiAgent.isTalking) {
-              convaiAgent.startInteraction();
-              splatSystem?.setPaused(true);
-              talkButton.setProperties({ text: "Stop Talking" });
-            } else {
-              convaiAgent.stopInteraction();
-              splatSystem?.setPaused(false);
-              talkButton.setProperties({ text: "Start Talking to Agent" });
+          talkButton.addEventListener("click", async () => {
+            try {
+              const { convaiAgent } = await import("./convaiAgent.js");
+              if (!convaiAgent.isTalking) {
+                convaiAgent.startInteraction();
+                splatSystem?.setPaused(true);
+                talkButton.setProperties({ text: "Stop Talking" });
+              } else {
+                convaiAgent.stopInteraction();
+                splatSystem?.setPaused(false);
+                talkButton.setProperties({ text: "Start Talking to Agent" });
+              }
+            } catch (err) {
+              console.warn("[UI] Convai agent unavailable:", err);
             }
           });
         }

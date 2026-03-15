@@ -21,7 +21,6 @@ import {
 } from "./gaussianSplatLoader.js";
 import { TimeMachineSystem } from "./timeMachineSystem.js";
 import { WORLDS } from "./worlds.js";
-import { convaiAgent } from "./convaiAgent.js";
 import { AudioManager } from "./audioManager.js";
 
 
@@ -54,14 +53,20 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     world.scene.background = new THREE.Color(0x000000);
     world.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
-    // Initialize Convai voice agent
-    convaiAgent.init();
-    convaiAgent.loadModel(world.scene, new THREE.Vector3(1, 0, -2));
-
     world
       .registerSystem(PanelSystem)
       .registerSystem(GaussianSplatLoaderSystem)
       .registerSystem(TimeMachineSystem);
+
+    // Initialize Convai voice agent (lazy load — won't crash app if SDK fails)
+    import("./convaiAgent.js")
+      .then(({ convaiAgent }) => {
+        convaiAgent.init();
+        convaiAgent.loadModel(world.scene, new THREE.Vector3(1, 0, -2));
+      })
+      .catch((err) => {
+        console.warn("[World] Convai agent unavailable:", err);
+      });
 
     // Initialize audio (ambient loops + transition sound)
     const audioManager = new AudioManager(world.camera);
