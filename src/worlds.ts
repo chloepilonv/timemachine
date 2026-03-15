@@ -21,7 +21,9 @@ export const WORLDS: Record<Era, WorldDef> = {
     era: "past",
     label: "1920s",
     year: "1920",
-    splatUrl: "./splats/past.spz",
+    // Fallback to the bundled "sensai" splat asset so we show a world even if
+    // the official era splats aren’t present (e.g. in a fresh checkout).
+    splatUrl: "./splats/sensai.spz",
     meshUrl: "",
     color: 0xd4a574,
   },
@@ -30,15 +32,15 @@ export const WORLDS: Record<Era, WorldDef> = {
     label: "Present",
     year: "2025",
     // Local file — copy your downloaded .spz into public/splats/
-    splatUrl: "./splats/present.spz",
-    meshUrl: "./splats/present-collider.glb",
+    splatUrl: "./splats/sensai.spz",
+    meshUrl: "",
     color: 0x4a90d9,
   },
   future: {
     era: "future",
     label: "Future",
     year: "2150",
-    splatUrl: "./splats/future.spz",
+    splatUrl: "./splats/sensai.spz",
     meshUrl: "",
     color: 0x7b2ff2,
   },
