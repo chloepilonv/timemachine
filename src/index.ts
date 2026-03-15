@@ -355,10 +355,12 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       worldReadyResolve!();
     });
 
-    // Auto-hide menu when entering VR (HTML overlay doesn't exist in XR)
+    // Auto-hide menus when entering VR
     world.visibilityState.subscribe((state) => {
       if (state !== VisibilityState.NonImmersive) {
         menu.classList.add("hidden");
+        welcomePanel.hide();
+        if (temporalConsole) temporalConsole.show();
         if (!audioStarted) {
           audioStarted = true;
           audioManager.start("present");
