@@ -205,6 +205,8 @@ export class GaussianSplatLoaderSystem extends createSystem({
 
     // Render splats behind UI panels (which use AlwaysDepth + high renderOrder)
     splat.renderOrder = -10;
+    // Prevent splat from blocking controller raycasts to UI panels
+    splat.raycast = () => {};
     parent.add(splat);
     if (collider) parent.add(collider);
 

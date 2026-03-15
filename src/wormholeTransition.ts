@@ -2,13 +2,17 @@
  * WormholeTransition — plays a fullscreen video sphere around the camera
  * during era transitions. The video plays while the new splat loads;
  * the transition ends when both the video finishes and the splat is ready.
+ *
+ * Hardened for Quest 3: every async path has timeouts, every state flag
+ * resets on forceEnd(), and stale setTimeout callbacks are guarded by a
+ * monotonically-increasing generation counter.
  */
 
 import * as THREE from "three";
 
 const VIDEO_PATH = "./wormhole.mp4";
-const FADE_DURATION_MS = 300;
-const MIN_DISPLAY_MS = 1500; // minimum time to show the wormhole
+const FADE_DURATION_MS = 200;
+const MIN_DISPLAY_MS = 800; // minimum time to show the wormhole
 
 export class WormholeTransition {
   private video: HTMLVideoElement;
@@ -24,7 +28,14 @@ export class WormholeTransition {
   private playStartTime = 0;
   private resolveTransition: (() => void) | null = null;
   private splatReady = false;
-  private videoEnded = false;
+
+  /**
+   * Monotonically-increasing generation counter. Incremented every time
+   * start() is called. Any deferred callback (setTimeout in tryFadeOut)
+   * captures the generation at scheduling time and aborts if it no longer
+   * matches — this prevents stale timers from corrupting a later transition.
+   */
+  private generation = 0;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -105,25 +116,38 @@ export class WormholeTransition {
   /**
    * Start the wormhole transition. Fades in the video sphere.
    * Returns immediately — does not block.
+   *
+   * If a previous transition is still active (e.g. stuck), it is
+   * force-ended first so we never deadlock.
    */
   start(): void {
-    if (this.active) return;
+    if (this.active) {
+      console.warn("[Wormhole] start() called while active — force-ending previous transition");
+      this.forceEnd();
+    }
 
+    this.generation++;
     this.active = true;
     this.splatReady = false;
-    this.videoEnded = false;
+    this.opacity = 0;
+    this.targetOpacity = 0;
+    this.fadeStartOpacity = 0;
+    this.fadeStartTime = 0;
+    this.resolveTransition = null;
     this.sphere.visible = true;
     this.scene.add(this.sphere);
     this.playStartTime = performance.now();
 
     this.video.currentTime = 0;
-    this.video.playbackRate = 2.0;
+    this.video.playbackRate = 4.0;
     this.video.play().catch((err) => {
       console.warn("[Wormhole] Video play failed:", err);
+      // Even if video fails we proceed — the sphere shows black which is
+      // acceptable as a transition screen.
     });
 
     this.fadeToOpacity(1);
-    console.log("[Wormhole] Started");
+    console.log("[Wormhole] Started (generation=" + this.generation + ")");
   }
 
   /**
@@ -131,6 +155,10 @@ export class WormholeTransition {
    * after the minimum display time has passed.
    */
   signalSplatReady(): void {
+    if (!this.active) {
+      console.warn("[Wormhole] signalSplatReady() called while not active — ignoring");
+      return;
+    }
     this.splatReady = true;
     console.log("[Wormhole] Splat ready");
     this.tryFadeOut();
@@ -138,10 +166,18 @@ export class WormholeTransition {
 
   /**
    * Returns a promise that resolves when the wormhole has fully faded out.
+   * Safe to call even if finish() already ran (resolves immediately).
    */
   waitForComplete(): Promise<void> {
     if (!this.active) return Promise.resolve();
     return new Promise((resolve) => {
+      // If there was a previous resolve callback that was never called
+      // (shouldn't happen, but be safe), resolve it now to avoid leaked promises.
+      if (this.resolveTransition) {
+        const old = this.resolveTransition;
+        this.resolveTransition = null;
+        old();
+      }
       this.resolveTransition = resolve;
     });
   }
@@ -159,7 +195,7 @@ export class WormholeTransition {
   }
 
   /**
-   * Must be called every frame.
+   * Must be called every frame (driven by the system's update loop).
    */
   tick(camera: THREE.Camera): void {
     if (!this.active) return;
@@ -185,12 +221,17 @@ export class WormholeTransition {
   }
 
   private tryFadeOut(): void {
+    if (!this.active) return;
     if (!this.splatReady) return;
 
+    const gen = this.generation;
     const elapsed = performance.now() - this.playStartTime;
     if (elapsed < MIN_DISPLAY_MS) {
-      // Wait for minimum display time
-      setTimeout(() => this.tryFadeOut(), MIN_DISPLAY_MS - elapsed);
+      // Wait for minimum display time — guarded by generation counter
+      setTimeout(() => {
+        if (this.generation !== gen) return; // stale timer, abort
+        this.tryFadeOut();
+      }, MIN_DISPLAY_MS - elapsed);
       return;
     }
 
@@ -205,13 +246,18 @@ export class WormholeTransition {
   }
 
   private finish(): void {
+    if (!this.active) return; // guard against double-finish
+
     this.active = false;
+    this.splatReady = false;
     this.sphere.visible = false;
     this.scene.remove(this.sphere);
     this.video.pause();
     this.opacity = 0;
+    this.targetOpacity = 0;
+    this.fadeStartOpacity = 0;
     this.material.uniforms.opacity.value = 0;
-    console.log("[Wormhole] Complete");
+    console.log("[Wormhole] Complete (generation=" + this.generation + ")");
 
     if (this.resolveTransition) {
       const cb = this.resolveTransition;
@@ -220,7 +266,18 @@ export class WormholeTransition {
     }
   }
 
+  /**
+   * Immediately kill the transition — reset ALL state so it can be reused.
+   * This is the nuclear option: resolves any pending promise, stops the
+   * video, hides the sphere, and clears every flag.
+   */
+  forceEnd(): void {
+    console.warn("[Wormhole] Force-ended (generation=" + this.generation + ")");
+    this.finish();
+  }
+
   dispose(): void {
+    this.forceEnd();
     this.video.pause();
     this.video.src = "";
     this.texture.dispose();

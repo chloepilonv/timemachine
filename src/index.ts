@@ -116,6 +116,27 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
         width: "40%",
       });
     panelEntity.object3D!.position.set(0, 1.29, -1.9);
+
+    // Remove ScreenSpace in XR so the panel is a static 3D interactable;
+    // restore it when returning to browser mode.
+    world.visibilityState.subscribe((state) => {
+      if (state === VisibilityState.NonImmersive) {
+        if (!panelEntity.hasComponent(ScreenSpace)) {
+          panelEntity.addComponent(ScreenSpace, {
+            top: "30%",
+            bottom: "30%",
+            left: "30%",
+            right: "30%",
+            height: "40%",
+            width: "40%",
+          });
+        }
+      } else {
+        if (panelEntity.hasComponent(ScreenSpace)) {
+          panelEntity.removeComponent(ScreenSpace);
+        }
+      }
+    });
   })
   .catch((err) => {
     console.error("[World] Failed to create the IWSDK world:", err);

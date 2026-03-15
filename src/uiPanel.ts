@@ -94,7 +94,9 @@ export class PanelSystem extends createSystem({
     this.queries.tmPanel.subscribe(
       "qualify",
       (entity) => {
-        makeEntityRenderOnTop(entity);
+        // NOTE: makeEntityRenderOnTop disabled temporarily — it may interfere
+        // with XR controller raycasting by modifying UIKit mesh materials/callbacks.
+        // makeEntityRenderOnTop(entity);
 
         const document = PanelDocument.data.document[
           entity.index
