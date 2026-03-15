@@ -64,10 +64,10 @@ export class GaussianSplatLoaderSystem extends createSystem({
     const spark = new SparkRenderer({
       renderer: this.world.renderer,
       enableLod: true,
-      lodSplatScale: 2.0,
-      behindFoveate: 1.0,
+      lodSplatScale: 1.0,  // Lowered from 2.0 for better performance
+      behindFoveate: 0.5,  // Reduced foveation for smoother frame rates
     });
-    spark.outsideFoveate = 1.0;
+    spark.outsideFoveate = 0.5;  // Reduced foveation outside fovea
     spark.renderOrder = -10;
     this.world.scene.add(spark);
     this.sparkRenderer = spark;
@@ -117,10 +117,15 @@ export class GaussianSplatLoaderSystem extends createSystem({
 
 
   // ----------------------------------------------------------
-  // Frame Loop
+  // Frame Loop — optimized to skip frames for performance
   // ----------------------------------------------------------
+  private frameCount = 0;
   update() {
+    this.frameCount++;
     if (this.animating.size === 0) return;
+
+    // Throttle animation updates to every 2nd frame for better performance
+    if (this.frameCount % 2 !== 0) return;
 
     for (const entityIndex of this.animating) {
       const instance = this.instances.get(entityIndex);
@@ -179,22 +184,53 @@ export class GaussianSplatLoaderSystem extends createSystem({
       this.sparkRenderer.lodSplatScale = lodSplatScale;
     }
 
-    const splat = new SplatMesh({
-      url: splatUrl,
-      lod: enableLod || undefined,
-    });
-    const timeout = new Promise<never>((_, reject) => {
-      setTimeout(
-        () =>
-          reject(
-            new Error(
-              `[GaussianSplatLoader] Timed out loading "${splatUrl}" after ${LOAD_TIMEOUT_MS / 1000}s`,
+    // Optimize: Defer splat creation to idle time if not animating
+    const createSplat = async () => {
+      const splat = new SplatMesh({
+        url: splatUrl,
+        lod: enableLod || undefined,
+      });
+      const timeout = new Promise<never>((_, reject) => {
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `[GaussianSplatLoader] Timed out loading "${splatUrl}" after ${LOAD_TIMEOUT_MS / 1000}s`,
+              ),
             ),
-          ),
-        LOAD_TIMEOUT_MS,
-      );
-    });
-    await Promise.race([splat.initialized, timeout]);
+          LOAD_TIMEOUT_MS,
+        );
+      });
+      await Promise.race([splat.initialized, timeout]);
+      return splat;
+    };
+
+    let splat: SplatMesh;
+    if (animate) {
+      splat = await createSplat();  // Immediate for animated loads
+    } else {
+      // Lazy load during idle time
+      splat = await new Promise((resolve, reject) => {
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(async () => {
+            try {
+              resolve(await createSplat());
+            } catch (err) {
+              reject(err);
+            }
+          });
+        } else {
+          // Fallback for browsers without requestIdleCallback
+          setTimeout(async () => {
+            try {
+              resolve(await createSplat());
+            } catch (err) {
+              reject(err);
+            }
+          }, 100);
+        }
+      });
+    }
 
     let collider: THREE.Group | null = null;
     if (meshUrl) {
@@ -264,6 +300,28 @@ export class GaussianSplatLoaderSystem extends createSystem({
     }
 
     this.removeInstance(entity.index);
+  }
+
+
+  // ----------------------------------------------------------
+  // Performance Mode — hook for voice control to adjust quality
+  // ----------------------------------------------------------
+  setPerformanceMode(enabled: boolean): void {
+    if (!this.sparkRenderer) return;
+
+    if (enabled) {
+      // Lower quality for performance during voice processing
+      this.sparkRenderer.lodSplatScale = 0.5;
+      this.sparkRenderer.behindFoveate = 0.1;
+      this.sparkRenderer.outsideFoveate = 0.3;
+      console.log("[GaussianSplatLoader] Performance mode enabled — reduced splat quality.");
+    } else {
+      // Restore higher quality when voice is idle
+      this.sparkRenderer.lodSplatScale = 1.0;
+      this.sparkRenderer.behindFoveate = 0.5;
+      this.sparkRenderer.outsideFoveate = 0.5;
+      console.log("[GaussianSplatLoader] Performance mode disabled — restored splat quality.");
+    }
   }
 
 
