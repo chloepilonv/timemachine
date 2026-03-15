@@ -64,10 +64,10 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     import("./convaiAgent.js")
       .then(async ({ convaiAgent }) => {
         convaiAgent.init();
-        await convaiAgent.loadModel(world.scene, new THREE.Vector3(0.5, 0.05, -1.95));
+        await convaiAgent.loadModel(world.scene, new THREE.Vector3(0.5, 0.6, -1.95));
         agentMesh = convaiAgent.mesh;
         if (agentMesh) {
-          agentMesh.scale.setScalar(0.45);
+          agentMesh.scale.setScalar(0.2);
           agentMesh.rotation.y = -0.54;
         }
 
@@ -135,7 +135,12 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     world.visibilityState.subscribe((state) => {
       const inVR = state !== VisibilityState.NonImmersive;
       splatEntity.object3D!.position.y = inVR ? VR_SCENE_LIFT : 0;
-      if (agentMesh) agentMesh.position.y = inVR ? VR_SCENE_LIFT + 0.05 : 0.05;
+      if (agentMesh) {
+        const y = inVR ? VR_SCENE_LIFT + 0.6 : 0.6;
+        agentMesh.position.y = y;
+        // Update baseY so floating animation bobs around the correct height
+        import("./convaiAgent.js").then(({ convaiAgent }) => { (convaiAgent as any).baseY = y; });
+      }
 
       if (inVR) {
         splatSystem.replayAnimation(splatEntity).catch((err) => {

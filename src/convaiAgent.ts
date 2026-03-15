@@ -11,20 +11,7 @@ export class ConvaiAgent {
 
   // Idle animation state
   private clock = new THREE.Clock(false);
-  private baseQuats: Map<string, THREE.Quaternion> = new Map();
-  private bones: {
-    hips: THREE.Bone | null;
-    spine1: THREE.Bone | null;
-    head: THREE.Bone | null;
-    leftArm: THREE.Bone | null;
-    rightArm: THREE.Bone | null;
-    leftForeArm: THREE.Bone | null;
-    rightForeArm: THREE.Bone | null;
-    leftShoulder: THREE.Bone | null;
-    rightShoulder: THREE.Bone | null;
-    neck: THREE.Bone | null;
-    spine: THREE.Bone | null;
-  } = { hips: null, spine1: null, head: null, leftArm: null, rightArm: null, leftForeArm: null, rightForeArm: null, leftShoulder: null, rightShoulder: null, neck: null, spine: null };
+  private baseY = 0;
 
   init() {
     if (this.client) return;
@@ -84,10 +71,11 @@ export class ConvaiAgent {
     return new Promise<void>((resolve, reject) => {
       const loader = new GLTFLoader();
       loader.load(
-        "./models/model_tourguide_v1.glb",
+        "./models/space_maintenance_robot.glb",
         (gltf) => {
           this.mesh = gltf.scene;
           this.mesh.position.copy(position);
+          this.baseY = position.y;
 
           // Basic shadow and material setup
           this.mesh.traverse((node: THREE.Object3D) => {
@@ -100,59 +88,7 @@ export class ConvaiAgent {
             }
           });
 
-          // Find key bones for procedural animation
-          this.mesh.traverse((node: THREE.Object3D) => {
-            if (node instanceof THREE.Bone) {
-              switch (node.name) {
-                case "Hips": this.bones.hips = node; break;
-                case "Spine1": this.bones.spine1 = node; break;
-                case "Head": this.bones.head = node; break;
-                case "LeftArm": this.bones.leftArm = node; break;
-                case "RightArm": this.bones.rightArm = node; break;
-                case "LeftForeArm": this.bones.leftForeArm = node; break;
-                case "RightForeArm": this.bones.rightForeArm = node; break;
-                case "LeftShoulder": this.bones.leftShoulder = node; break;
-                case "RightShoulder": this.bones.rightShoulder = node; break;
-                case "Neck": this.bones.neck = node; break;
-                case "Spine": this.bones.spine = node; break;
-              }
-            }
-          });
-
-          // Take avatar out of T-pose into a natural standing pose
-          // Apply a downward rotation in world-space via quaternion multiply
-          const downRotL = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(60)
-          );
-          const downRotR = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(-60)
-          );
-          if (this.bones.leftShoulder) {
-            this.bones.leftShoulder.quaternion.multiply(downRotL);
-          }
-          if (this.bones.rightShoulder) {
-            this.bones.rightShoulder.quaternion.multiply(downRotR);
-          }
-          // Slight bend in elbows so arms don't look rigid
-          if (this.bones.leftForeArm) {
-            this.bones.leftForeArm.rotation.y = THREE.MathUtils.degToRad(15);
-          }
-          if (this.bones.rightForeArm) {
-            this.bones.rightForeArm.rotation.y = THREE.MathUtils.degToRad(-15);
-          }
-
-          // Store base quaternions after posing — idle animation applies on top
-          for (const [name, bone] of Object.entries(this.bones)) {
-            if (bone) this.baseQuats.set(name, bone.quaternion.clone());
-          }
-
-          const foundBones = Object.entries(this.bones)
-            .filter(([, b]) => b !== null)
-            .map(([name]) => name);
-          console.log("[ConvaiAgent] Found bones:", foundBones.join(", "));
-
-          // Hook idle animation into the render loop via onBeforeRender
-          // (fires every frame in both desktop and XR modes)
+          // Hook floating animation into the render loop via onBeforeRender
           let firstMesh: THREE.Mesh | null = null;
           this.mesh.traverse((node: THREE.Object3D) => {
             if (!firstMesh && node instanceof THREE.Mesh) firstMesh = node;
@@ -165,86 +101,33 @@ export class ConvaiAgent {
 
           this.clock.start();
           scene.add(this.mesh);
-          console.log("[ConvaiAgent] ✅ Avaturn model loaded at", position.toArray());
+          console.log("[ConvaiAgent] ✅ Robot model loaded at", position.toArray());
           resolve();
         },
         undefined,
         (err) => {
-          console.error("[ConvaiAgent] ❌ Failed to load Avaturn model:", err);
+          console.error("[ConvaiAgent] ❌ Failed to load robot model:", err);
           reject(err);
         }
       );
     });
   }
 
-  /** Apply a small rotation delta on top of the stored base pose. */
-  private applyDelta(name: string, bone: THREE.Bone, x: number, y: number, z: number) {
-    const base = this.baseQuats.get(name);
-    if (!base) return;
-    const delta = new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z));
-    bone.quaternion.copy(base).multiply(delta);
-  }
-
-  /** Call every frame for procedural idle animation. */
+  /** Call every frame for floating idle animation. */
   update(_delta: number) {
-    if (!this.mesh || this.baseQuats.size === 0) return;
+    if (!this.mesh) return;
 
     const t = this.clock.getElapsedTime();
 
-    // Breathing: chest expansion on Spine1
-    if (this.bones.spine1) {
-      const breath = Math.sin(t * 2.5) * 0.5 + 0.5;
-      this.bones.spine1.scale.y = 1.0 + breath * 0.025;
-      this.applyDelta("spine1", this.bones.spine1, breath * 0.015, 0, 0);
-    }
+    // Gentle hover bob
+    this.mesh.position.y = this.baseY + Math.sin(t * 1.5) * 0.05;
 
-    // Weight shift: slow sway on Hips
-    if (this.bones.hips) {
-      this.applyDelta("hips", this.bones.hips,
-        0,
-        Math.sin(t * 0.5) * 0.01,
-        Math.sin(t * 0.8) * 0.025 + Math.sin(t * 0.3) * 0.01
-      );
-    }
+    // Slow tilt/rock for life
+    this.mesh.rotation.x = Math.sin(t * 0.8) * 0.03;
+    this.mesh.rotation.z = Math.sin(t * 0.6 + 1.0) * 0.025;
 
-    // Spine follows hips subtly
-    if (this.bones.spine) {
-      this.applyDelta("spine", this.bones.spine, 0, 0, Math.sin(t * 0.8 + 0.5) * -0.01);
-    }
-
-    // Neck + Head: layered look-around
-    if (this.bones.neck) {
-      this.applyDelta("neck", this.bones.neck,
-        Math.sin(t * 0.6) * 0.02,
-        Math.sin(t * 0.35) * 0.015,
-        0
-      );
-    }
-    if (this.bones.head) {
-      this.applyDelta("head", this.bones.head,
-        Math.sin(t * 1.1 + 1.0) * 0.025 + Math.sin(t * 0.3) * 0.01,
-        Math.sin(t * 0.45 + 2.0) * 0.03,
-        Math.sin(t * 0.7) * 0.008
-      );
-    }
-
-    // Shoulders: subtle rise/fall with breathing
-    const shoulderBreath = Math.sin(t * 2.5) * 0.01;
-    if (this.bones.leftShoulder) {
-      this.applyDelta("leftShoulder", this.bones.leftShoulder, 0, 0, shoulderBreath);
-    }
-    if (this.bones.rightShoulder) {
-      this.applyDelta("rightShoulder", this.bones.rightShoulder, 0, 0, -shoulderBreath);
-    }
-
-    // Arms: gentle swing
-    const armSwing = Math.sin(t * 0.8 + 1.0) * 0.015;
-    if (this.bones.leftArm) {
-      this.applyDelta("leftArm", this.bones.leftArm, armSwing, 0, 0);
-    }
-    if (this.bones.rightArm) {
-      this.applyDelta("rightArm", this.bones.rightArm, -armSwing, 0, 0);
-    }
+    // Gentle yaw drift
+    this.mesh.rotation.y += Math.sin(t * 0.3) * 0.0003;
   }
 
   startInteraction() {
