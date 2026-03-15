@@ -41,7 +41,7 @@ export class TimeMachineSystem extends createSystem({
   private eraChangeListeners: ((era: Era) => void)[] = [];
   private wormhole: WormholeTransition | null = null;
   private audioManager: AudioManager | null = null;
-  private inputEnabled = false;
+  private inputEnabled = true;
 
   /**
    * Resolved from the system's update() tick when the wormhole reaches
@@ -100,6 +100,10 @@ export class TimeMachineSystem extends createSystem({
 
   enableInput() {
     this.inputEnabled = true;
+  }
+
+  disableInput() {
+    this.inputEnabled = false;
   }
 
   async switchTo(era: Era): Promise<void> {

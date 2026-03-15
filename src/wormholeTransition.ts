@@ -12,7 +12,7 @@ import * as THREE from "three";
 
 const VIDEO_PATH = "./wormhole.mp4";
 const FADE_DURATION_MS = 350;
-const FLASH_DURATION_MS = 1000;
+const FLASH_DURATION_MS = 1500;
 const MIN_DISPLAY_MS = 3000;
 
 export class WormholeTransition {
@@ -217,13 +217,15 @@ export class WormholeTransition {
     this.opacity = this.fadeStartOpacity + (this.targetOpacity - this.fadeStartOpacity) * t;
     this.material.uniforms.opacity.value = this.opacity;
 
-    // Animate flash (bright white burst that fades quickly)
+    // Animate flash — holds full white then fades with ease-out
     if (this.flashActive) {
       const flashElapsed = now - this.flashStartTime;
       const flashT = Math.min(flashElapsed / FLASH_DURATION_MS, 1);
-      this.material.uniforms.flash.value = 1.0 - flashT;
+      // Hold at full white for first 30%, then ease-out fade
+      const flashVal = flashT < 0.3 ? 1.0 : 1.0 - ((flashT - 0.3) / 0.7) ** 0.5;
+      this.material.uniforms.flash.value = flashVal;
       // Force full opacity during flash so it's not transparent
-      this.material.uniforms.opacity.value = Math.max(this.opacity, 1.0 - flashT);
+      this.material.uniforms.opacity.value = Math.max(this.opacity, flashVal);
       if (flashT >= 1) this.flashActive = false;
     } else {
       this.material.uniforms.flash.value = 0;
