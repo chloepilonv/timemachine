@@ -6,6 +6,7 @@ import {
   LocomotionEnvironment,
   Mesh,
   MeshBasicMaterial,
+  PanelDocument,
   PanelUI,
   PlaneGeometry,
   ScreenSpace,
@@ -117,8 +118,10 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       });
     panelEntity.object3D!.position.set(0, 1.29, -1.9);
 
-    // Remove ScreenSpace in XR so the panel is a static 3D interactable;
-    // restore it when returning to browser mode.
+    // In XR: remove ScreenSpace and re-parent the UIKitDocument back to
+    // the panel entity so the raycaster can find it. Without this, the
+    // document stays under the camera (where ScreenSpaceUISystem put it)
+    // and controller rays never intersect it.
     world.visibilityState.subscribe((state) => {
       if (state === VisibilityState.NonImmersive) {
         if (!panelEntity.hasComponent(ScreenSpace)) {
@@ -134,6 +137,11 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       } else {
         if (panelEntity.hasComponent(ScreenSpace)) {
           panelEntity.removeComponent(ScreenSpace);
+        }
+        // Re-parent UIKitDocument from camera back to panel entity
+        const doc = PanelDocument.data.document[panelEntity.index];
+        if (doc && doc.parent !== panelEntity.object3D) {
+          panelEntity.object3D!.add(doc);
         }
       }
     });
