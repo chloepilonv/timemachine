@@ -179,14 +179,12 @@ export class TimeMachineSystem extends createSystem({
     this.audioManager?.switchEra(era);
 
     // 4. Fade out wormhole + transition audio
+    this.audioManager?.stopTransition();
     this.wormhole!.signalSplatReady();
     await Promise.race([
       this.wormhole!.waitForComplete(),
       new Promise<void>((r) => setTimeout(r, FADE_OUT_TIMEOUT_MS)),
     ]);
-
-    // Stop transition audio
-    this.audioManager?.stopTransition();
 
     // If the wormhole is somehow still active after the timeout, force it off.
     if (this.wormhole!.isActive()) {
