@@ -355,16 +355,10 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       worldReadyResolve!();
     });
 
-    // Auto-hide menus when entering VR
+    // Auto-hide HTML menu when entering VR (3D welcome panel stays — user must click it)
     world.visibilityState.subscribe((state) => {
       if (state !== VisibilityState.NonImmersive) {
         menu.classList.add("hidden");
-        welcomePanel.hide();
-        if (temporalConsole) temporalConsole.show();
-        if (!audioStarted) {
-          audioStarted = true;
-          audioManager.start("present");
-        }
       }
     });
   })
