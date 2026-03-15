@@ -21,6 +21,7 @@ import {
 } from "./gaussianSplatLoader.js";
 import { TimeMachineSystem } from "./timeMachineSystem.js";
 import { WORLDS } from "./worlds.js";
+import { convaiAgent } from "./convaiAgent.js";
 
 
 // ------------------------------------------------------------
@@ -48,6 +49,10 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 
     world.scene.background = new THREE.Color(0x000000);
     world.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+    // Initialize Convai voice agent
+    convaiAgent.init();
+    convaiAgent.loadModel(world.scene, new THREE.Vector3(1, 0, -2));
 
     world
       .registerSystem(PanelSystem)

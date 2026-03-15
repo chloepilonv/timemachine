@@ -264,6 +264,16 @@ export class GaussianSplatLoaderSystem extends createSystem({
 
 
   // ----------------------------------------------------------
+  // Performance — pause/resume splat rendering (for voice input)
+  // ----------------------------------------------------------
+  setPaused(paused: boolean): void {
+    if (this.sparkRenderer) {
+      this.sparkRenderer.autoUpdate = !paused;
+    }
+  }
+
+
+  // ----------------------------------------------------------
   // Cleanup – dispose GPU resources and detach from the scene
   // ----------------------------------------------------------
   private removeInstance(entityIndex: number): void {
