@@ -26,7 +26,11 @@ git clone git@github.com:chloepilonv/timemachine_webxr.git
 cd timemachine_webxr
 npm install
 ```
+> If you see Vite errors like `Failed to resolve import "convai-web-sdk"`, run:
 
+```bash
+npm install convai-web-sdk --save
+```
 ### Asset Setup
 
 The Gaussian splat files are too large for git (~20-30 MB each). You need to download them into `public/splats/` before running.

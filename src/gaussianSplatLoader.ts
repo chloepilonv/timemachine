@@ -73,19 +73,31 @@ export class GaussianSplatLoaderSystem extends createSystem({
     this.sparkRenderer = spark;
 
     // SparkJS driveLod() deep-clones the camera every frame. IWSDK's
-    // camera has UIKitDocument children that crash during any copy/clone
-    // chain (even non-recursive), so we bypass it entirely and construct
-    // a plain PerspectiveCamera with only the transform/projection data
-    // SparkJS needs for LoD distance calculations.
-    const cam = this.world.camera as THREE.PerspectiveCamera;
-    cam.clone = function () {
-      const c = new THREE.PerspectiveCamera();
-      c.projectionMatrix.copy(this.projectionMatrix);
-      c.projectionMatrixInverse.copy(this.projectionMatrixInverse);
-      c.matrixWorld.copy(this.matrixWorld);
-      c.matrixWorldInverse.copy(this.matrixWorldInverse);
-      return c;
-    };
+    // camera may include UIKitDocument sub-objects that crash during any
+    // deep clone (even non-recursive). We instead override clone() to only
+    // copy the projection/transform data SparkJS needs.
+    const cam = this.world.camera as THREE.PerspectiveCamera | null;
+    if (cam && typeof cam === "object") {
+      try {
+        cam.clone = function () {
+          const c = new THREE.PerspectiveCamera();
+          c.projectionMatrix.copy(this.projectionMatrix);
+          c.projectionMatrixInverse.copy(this.projectionMatrixInverse);
+          c.matrixWorld.copy(this.matrixWorld);
+          c.matrixWorldInverse.copy(this.matrixWorldInverse);
+          return c;
+        };
+      } catch (err) {
+        console.warn(
+          "[GaussianSplatLoader] Could not patch camera.clone() for LOD. This may affect splat LOD calculations.",
+          err,
+        );
+      }
+    } else {
+      console.warn(
+        "[GaussianSplatLoader] No valid camera found to patch for LOD. SparkJS LOD behavior may be degraded.",
+      );
+    }
 
     this.queries.splats.subscribe("qualify", (entity) => {
       const autoLoad = entity.getValue(
