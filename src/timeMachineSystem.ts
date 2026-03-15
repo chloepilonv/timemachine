@@ -38,7 +38,7 @@ export class TimeMachineSystem extends createSystem({
   private currentEra: Era = "present";
   private splatEntity: Entity | null = null;
   private switching = false;
-  private onEraChange: ((era: Era) => void) | null = null;
+  private eraChangeListeners: ((era: Era) => void)[] = [];
   private wormhole: WormholeTransition | null = null;
   private audioManager: AudioManager | null = null;
 
@@ -90,7 +90,7 @@ export class TimeMachineSystem extends createSystem({
   }
 
   setEraChangeCallback(cb: (era: Era) => void) {
-    this.onEraChange = cb;
+    this.eraChangeListeners.push(cb);
   }
 
   setAudioManager(audio: AudioManager) {
@@ -108,7 +108,7 @@ export class TimeMachineSystem extends createSystem({
     console.log(`[TimeMachine] Switching ${this.currentEra} -> ${era}`);
 
     // Update UI label immediately
-    this.onEraChange?.(era);
+    this.eraChangeListeners.forEach((cb) => cb(era));
 
     // Play transition whoosh
     this.audioManager?.playTransition();

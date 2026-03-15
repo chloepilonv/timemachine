@@ -14,6 +14,7 @@ export interface WorldDef {
   splatUrl: string;
   meshUrl: string;
   color: number;
+  convaiCharacterId: string;
 }
 
 export const WORLDS: Record<Era, WorldDef> = {
@@ -24,6 +25,7 @@ export const WORLDS: Record<Era, WorldDef> = {
     splatUrl: "./splats/past.spz",
     meshUrl: "",
     color: 0xd4a574,
+    convaiCharacterId: "72f7bc58-2086-11f1-baa2-42010a7be02c",
   },
   present: {
     era: "present",
@@ -33,6 +35,7 @@ export const WORLDS: Record<Era, WorldDef> = {
     splatUrl: "./splats/present.spz",
     meshUrl: "./splats/present-collider.glb",
     color: 0x4a90d9,
+    convaiCharacterId: "5d6b64ae-2089-11f1-a576-42010a7be02c",
   },
   future: {
     era: "future",
@@ -41,6 +44,7 @@ export const WORLDS: Record<Era, WorldDef> = {
     splatUrl: "./splats/future.spz",
     meshUrl: "",
     color: 0x7b2ff2,
+    convaiCharacterId: "74b3fb9c-2086-11f1-9167-42010a7be02c",
   },
 };
 

@@ -105,6 +105,13 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     const timeMachine = world.getSystem(TimeMachineSystem)!;
     timeMachine.setAudioManager(audioManager);
 
+    // Switch Convai character when era changes
+    timeMachine.setEraChangeCallback((era) => {
+      import("./convaiAgent.js")
+        .then(({ convaiAgent }) => convaiAgent.switchEra(era))
+        .catch(() => {});
+    });
+
     // Start ambient audio on first XR entry or user interaction
     world.visibilityState.subscribe((state) => {
       if (state !== VisibilityState.NonImmersive) {

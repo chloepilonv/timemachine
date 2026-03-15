@@ -1,6 +1,7 @@
 import { ConvaiClient } from "convai-web-sdk";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { WORLDS, type Era } from "./worlds.js";
 
 export class ConvaiAgent {
   client: ConvaiClient | null = null;
@@ -8,31 +9,35 @@ export class ConvaiAgent {
   isTalking: boolean = false;
   lastTranscript: string = "";
   _cooldown: boolean = false;
+  private currentEra: Era = "present";
 
   // Idle animation state
   private clock = new THREE.Clock(false);
   private baseY = 0;
 
-  init() {
-    if (this.client) return;
+  private apiKey = (import.meta as any).env.VITE_CONVAI_API_KEY;
 
-    const apiKey = (import.meta as any).env.VITE_CONVAI_API_KEY;
-    const characterId = (import.meta as any).env.VITE_CONVAI_CHARACTER_ID;
+  init(era: Era = "present") {
+    this.createClient(WORLDS[era].convaiCharacterId);
+    this.currentEra = era;
+  }
 
-    console.log("[ConvaiAgent] Initializing with characterId:", characterId);
-    console.log("[ConvaiAgent] API key present:", !!apiKey);
+  private createClient(characterId: string) {
+    // Stop any playing audio on the old client before replacing
+    if (this.client) {
+      this.client.stopCharacterAudio();
+    }
+
+    console.log("[ConvaiAgent] Creating client with characterId:", characterId);
 
     this.client = new ConvaiClient({
-      apiKey,
+      apiKey: this.apiKey,
       characterId,
       enableAudio: true,
       enableFacialData: false,
     });
 
-    // CRITICAL: This callback receives the AI's response (text + audio)
     this.client.setResponseCallback((response: any) => {
-      // The audio is handled automatically by the SDK's internal audio player.
-      // Here we just log the text transcript for debugging.
       if (response?.hasAudioResponse?.()) {
         const audioResponse = response.getAudioResponse();
         if (audioResponse) {
@@ -64,7 +69,14 @@ export class ConvaiAgent {
       console.log("[ConvaiAgent] 🔇 Agent audio stopped.");
     });
 
-    console.log("[ConvaiAgent] ✅ Initialized successfully.");
+    console.log("[ConvaiAgent] ✅ Initialized for era:", this.currentEra);
+  }
+
+  switchEra(era: Era) {
+    if (era === this.currentEra) return;
+    console.log(`[ConvaiAgent] Switching character: ${this.currentEra} -> ${era}`);
+    this.currentEra = era;
+    this.createClient(WORLDS[era].convaiCharacterId);
   }
 
   async loadModel(scene: THREE.Scene, position: THREE.Vector3) {
