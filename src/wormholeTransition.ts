@@ -11,8 +11,9 @@
 import * as THREE from "three";
 
 const VIDEO_PATH = "./wormhole.mp4";
-const FADE_DURATION_MS = 500;
-const MIN_DISPLAY_MS = 5000; // let the wormhole video play (~6s matches audio)
+const FADE_DURATION_MS = 350;
+const FLASH_DURATION_MS = 1000;
+const MIN_DISPLAY_MS = 3000;
 
 export class WormholeTransition {
   private video: HTMLVideoElement;
@@ -28,6 +29,8 @@ export class WormholeTransition {
   private playStartTime = 0;
   private resolveTransition: (() => void) | null = null;
   private splatReady = false;
+  private flashStartTime = 0;
+  private flashActive = false;
 
   /**
    * Monotonically-increasing generation counter. Incremented every time
@@ -55,6 +58,7 @@ export class WormholeTransition {
       uniforms: {
         map: { value: this.texture },
         opacity: { value: 0.0 },
+        flash: { value: 0.0 },
       },
       vertexShader: /* glsl */ `
         varying vec2 vUv;
@@ -66,10 +70,12 @@ export class WormholeTransition {
       fragmentShader: /* glsl */ `
         uniform sampler2D map;
         uniform float opacity;
+        uniform float flash;
         varying vec2 vUv;
         void main() {
           vec4 color = texture2D(map, vUv);
-          gl_FragColor = vec4(color.rgb, opacity);
+          vec3 rgb = mix(color.rgb, vec3(1.0), flash);
+          gl_FragColor = vec4(rgb, opacity);
         }
       `,
       transparent: true,
@@ -139,7 +145,9 @@ export class WormholeTransition {
     this.playStartTime = performance.now();
 
     this.video.currentTime = 0;
-    this.video.playbackRate = 1.5; // slightly faster than real-time, ~6s matches audio
+    this.video.playbackRate = 2.5;
+    this.flashActive = true;
+    this.flashStartTime = performance.now();
     this.video.play().catch((err) => {
       console.warn("[Wormhole] Video play failed:", err);
       // Even if video fails we proceed — the sphere shows black which is
@@ -209,6 +217,18 @@ export class WormholeTransition {
     this.opacity = this.fadeStartOpacity + (this.targetOpacity - this.fadeStartOpacity) * t;
     this.material.uniforms.opacity.value = this.opacity;
 
+    // Animate flash (bright white burst that fades quickly)
+    if (this.flashActive) {
+      const flashElapsed = now - this.flashStartTime;
+      const flashT = Math.min(flashElapsed / FLASH_DURATION_MS, 1);
+      this.material.uniforms.flash.value = 1.0 - flashT;
+      // Force full opacity during flash so it's not transparent
+      this.material.uniforms.opacity.value = Math.max(this.opacity, 1.0 - flashT);
+      if (flashT >= 1) this.flashActive = false;
+    } else {
+      this.material.uniforms.flash.value = 0;
+    }
+
     // Update video texture
     if (this.video.readyState >= this.video.HAVE_CURRENT_DATA) {
       this.texture.needsUpdate = true;
@@ -236,6 +256,8 @@ export class WormholeTransition {
     }
 
     console.log("[Wormhole] Fading out");
+    this.flashActive = true;
+    this.flashStartTime = performance.now();
     this.fadeToOpacity(0);
   }
 

@@ -7,8 +7,205 @@
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
     />
     <title>Time Machine — SF Ferry Building</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      /* ── Main Menu Overlay ─────────────────────────────────── */
+      #main-menu {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 28px;
+        font-family: 'Orbitron', sans-serif;
+        overflow: hidden;
+
+        /* Starfield background */
+        background: radial-gradient(ellipse at 30% 20%, #1a0a3e 0%, transparent 50%),
+                    radial-gradient(ellipse at 70% 80%, #0a1a3e 0%, transparent 50%),
+                    radial-gradient(ellipse at 50% 50%, #0d0d2b 0%, #000008 100%);
+      }
+
+      #main-menu.hidden { display: none; }
+
+      /* Twinkling stars layer */
+      #main-menu::before,
+      #main-menu::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.8), transparent),
+          radial-gradient(1px 1px at 25% 55%, rgba(255,255,255,0.6), transparent),
+          radial-gradient(1.5px 1.5px at 40% 15%, rgba(200,180,255,0.9), transparent),
+          radial-gradient(1px 1px at 55% 70%, rgba(255,255,255,0.5), transparent),
+          radial-gradient(1px 1px at 70% 35%, rgba(255,255,255,0.7), transparent),
+          radial-gradient(1.5px 1.5px at 85% 60%, rgba(180,200,255,0.8), transparent),
+          radial-gradient(1px 1px at 15% 80%, rgba(255,255,255,0.4), transparent),
+          radial-gradient(1px 1px at 90% 10%, rgba(255,255,255,0.6), transparent),
+          radial-gradient(1px 1px at 50% 45%, rgba(255,220,255,0.5), transparent),
+          radial-gradient(1.5px 1.5px at 35% 90%, rgba(200,200,255,0.7), transparent),
+          radial-gradient(1px 1px at 65% 5%, rgba(255,255,255,0.5), transparent),
+          radial-gradient(1px 1px at 80% 85%, rgba(255,255,255,0.6), transparent);
+        background-size: 100% 100%;
+        animation: twinkle 4s ease-in-out infinite alternate;
+      }
+      #main-menu::after {
+        background-image:
+          radial-gradient(1px 1px at 5% 40%, rgba(255,255,255,0.7), transparent),
+          radial-gradient(1.5px 1.5px at 20% 75%, rgba(180,180,255,0.6), transparent),
+          radial-gradient(1px 1px at 45% 30%, rgba(255,255,255,0.5), transparent),
+          radial-gradient(1px 1px at 60% 90%, rgba(255,200,255,0.6), transparent),
+          radial-gradient(1px 1px at 75% 50%, rgba(255,255,255,0.4), transparent),
+          radial-gradient(1.5px 1.5px at 95% 25%, rgba(200,220,255,0.8), transparent),
+          radial-gradient(1px 1px at 30% 10%, rgba(255,255,255,0.5), transparent),
+          radial-gradient(1px 1px at 50% 65%, rgba(255,255,255,0.6), transparent);
+        animation: twinkle 5s ease-in-out 1.5s infinite alternate-reverse;
+      }
+
+      @keyframes twinkle {
+        0%   { opacity: 0.4; }
+        100% { opacity: 1.0; }
+      }
+
+      /* Title */
+      #main-menu h1 {
+        font-size: clamp(1.2rem, 4vw, 2.4rem);
+        font-weight: 900;
+        letter-spacing: 0.15em;
+        color: #c8b8ff;
+        text-shadow:
+          0 0 20px rgba(120, 80, 255, 0.6),
+          0 0 60px rgba(120, 80, 255, 0.3);
+        text-align: center;
+        z-index: 1;
+      }
+
+      #main-menu .subtitle {
+        font-size: clamp(0.65rem, 1.8vw, 0.9rem);
+        font-weight: 400;
+        letter-spacing: 0.3em;
+        color: rgba(180, 170, 220, 0.7);
+        text-transform: uppercase;
+        z-index: 1;
+        margin-top: -12px;
+      }
+
+      /* Buttons */
+      .menu-btn {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(0.7rem, 2vw, 1rem);
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        padding: 16px 48px;
+        border: 2px solid;
+        border-radius: 4px;
+        background: transparent;
+        cursor: pointer;
+        z-index: 1;
+        transition: background 0.2s, box-shadow 0.2s;
+        text-transform: uppercase;
+      }
+
+      #enter-btn {
+        color: #c8b8ff;
+        border-color: rgba(140, 100, 255, 0.6);
+        animation: pulse-border 2.5s ease-in-out infinite;
+      }
+      #enter-btn:hover {
+        background: rgba(140, 100, 255, 0.15);
+        box-shadow: 0 0 30px rgba(140, 100, 255, 0.4);
+      }
+
+      @keyframes pulse-border {
+        0%, 100% { border-color: rgba(140, 100, 255, 0.4); box-shadow: 0 0 10px rgba(140, 100, 255, 0.1); }
+        50%      { border-color: rgba(140, 100, 255, 0.9); box-shadow: 0 0 25px rgba(140, 100, 255, 0.3); }
+      }
+
+      #menu-talk-btn {
+        color: #80ffb0;
+        border-color: rgba(80, 220, 140, 0.6);
+      }
+      #menu-talk-btn:hover {
+        background: rgba(80, 220, 140, 0.15);
+        box-shadow: 0 0 30px rgba(80, 220, 140, 0.4);
+      }
+
+      #enter-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        animation: none;
+      }
+
+      /* Loading bar */
+      #loading-bar-container {
+        width: clamp(200px, 40vw, 400px);
+        height: 4px;
+        background: rgba(140, 100, 255, 0.15);
+        border-radius: 2px;
+        overflow: hidden;
+        z-index: 1;
+      }
+      #loading-bar {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #8c64ff, #c8b8ff);
+        border-radius: 2px;
+        transition: width 0.3s ease;
+      }
+      #loading-bar-container.hidden, #loading-status.hidden { display: none; }
+
+      /* Persistent talk button */
+      .talk-floating {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 999;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        padding: 10px 20px;
+        border: 1px solid rgba(80, 220, 140, 0.5);
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #80ffb0;
+        cursor: pointer;
+        display: none;
+        text-transform: uppercase;
+      }
+      .talk-floating:hover {
+        background: rgba(80, 220, 140, 0.15);
+        box-shadow: 0 0 20px rgba(80, 220, 140, 0.3);
+      }
+      .talk-floating.visible { display: block; }
+    </style>
   </head>
   <body style="margin: 0">
+    <!-- Main menu overlay -->
+    <div id="main-menu">
+      <h1>TIME MACHINE</h1>
+      <div id="loading-status" class="subtitle" style="margin-top: 8px;">Loading world...</div>
+      <div id="loading-bar-container">
+        <div id="loading-bar"></div>
+      </div>
+      <button id="enter-btn" class="menu-btn" disabled>Loading...</button>
+      <button id="menu-talk-btn" class="menu-btn">Start Talking to Agent</button>
+    </div>
+
+    <!-- Persistent talk button — stays visible after menu dismissal (desktop only) -->
+    <button id="talk-btn-persistent" class="talk-floating">Talk to Agent</button>
+
     <div id="scene-container" style="background:#000"></div>
     <script type="module" src="/src/index.ts"></script>
   </body>

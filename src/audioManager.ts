@@ -21,7 +21,7 @@ const AMBIENT_URLS: Record<Era, string> = {
   future: "./audio/future_ambient_sound.mp3",
 };
 
-const TRANSITION_URL = "./audio/wormhole_transition.mp3";
+const TRANSITION_URL = "./audio/wormhole_transition_long.mp3";
 
 export class AudioManager {
   private listener: THREE.AudioListener;
