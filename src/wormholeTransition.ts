@@ -1,7 +1,7 @@
 /**
- * WormholeTransition — plays a fullscreen video sphere around the camera
- * during era transitions. The video plays while the new splat loads;
- * the transition ends when both the video finishes and the splat is ready.
+ * WormholeTransition — bright flash + color burst during era transitions.
+ * No video file needed. A sphere around the camera flashes white, then
+ * fades through the era color before clearing to reveal the new world.
  *
  * Hardened for Quest 3: every async path has timeouts, every state flag
  * resets on forceEnd(), and stale setTimeout callbacks are guarded by a
@@ -9,67 +9,56 @@
  */
 
 import * as THREE from "three";
+import { WORLDS, type Era } from "./worlds.js";
 
-const VIDEO_PATH = "./wormhole.mp4";
-const FADE_DURATION_MS = 200;
-const MIN_DISPLAY_MS = 800; // minimum time to show the wormhole
+const FLASH_IN_MS = 150; // white flash ramps up
+const HOLD_MS = 400; // hold at full brightness while splat loads
+const FLASH_OUT_MS = 350; // fade out to reveal new world
+const MIN_DISPLAY_MS = 600; // minimum total time before fade-out starts
 
 export class WormholeTransition {
-  private video: HTMLVideoElement;
-  private texture: THREE.VideoTexture;
   private sphere: THREE.Mesh;
   private material: THREE.ShaderMaterial;
   private scene: THREE.Scene;
   private active = false;
-  private opacity = 0;
-  private targetOpacity = 0;
-  private fadeStartTime = 0;
-  private fadeStartOpacity = 0;
-  private playStartTime = 0;
+  private phase: "flash-in" | "hold" | "flash-out" | "done" = "done";
+  private phaseStart = 0;
   private resolveTransition: (() => void) | null = null;
   private splatReady = false;
-
-  /**
-   * Monotonically-increasing generation counter. Incremented every time
-   * start() is called. Any deferred callback (setTimeout in tryFadeOut)
-   * captures the generation at scheduling time and aborts if it no longer
-   * matches — this prevents stale timers from corrupting a later transition.
-   */
   private generation = 0;
+  private targetEra: Era = "present";
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
-    this.video = document.createElement("video");
-    this.video.src = VIDEO_PATH;
-    this.video.loop = true; // loop so it keeps playing if splat is slow
-    this.video.muted = true;
-    this.video.playsInline = true;
-    this.video.crossOrigin = "anonymous";
-    this.video.preload = "auto";
-
-    this.texture = new THREE.VideoTexture(this.video);
-    this.texture.colorSpace = THREE.SRGBColorSpace;
-
     this.material = new THREE.ShaderMaterial({
       uniforms: {
-        map: { value: this.texture },
         opacity: { value: 0.0 },
+        color: { value: new THREE.Color(1, 1, 1) },
+        progress: { value: 0.0 },
       },
       vertexShader: /* glsl */ `
-        varying vec2 vUv;
+        varying vec3 vPos;
         void main() {
-          vUv = uv;
+          vPos = position;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
       fragmentShader: /* glsl */ `
-        uniform sampler2D map;
         uniform float opacity;
-        varying vec2 vUv;
+        uniform vec3 color;
+        uniform float progress;
+        varying vec3 vPos;
         void main() {
-          vec4 color = texture2D(map, vUv);
-          gl_FragColor = vec4(color.rgb, opacity);
+          // Radial gradient from center — bright core fading to edges
+          float dist = length(vPos.xz) / 3.0;
+          float radial = 1.0 - smoothstep(0.0, 1.0, dist);
+          float core = radial * 0.4 + 0.6;
+
+          // Mix white flash with era color as progress increases
+          vec3 flashColor = mix(vec3(1.0), color, progress * 0.6);
+
+          gl_FragColor = vec4(flashColor * core, opacity);
         }
       `,
       transparent: true,
@@ -78,101 +67,51 @@ export class WormholeTransition {
       side: THREE.BackSide,
     });
 
-    // Cylinder wraps the video around you like a wormhole tunnel
-    // Open-ended so you see the video on the walls, with caps for top/bottom
-    const cylinder = new THREE.CylinderGeometry(3, 3, 20, 64, 1, true);
-    const capGeo = new THREE.CircleGeometry(3, 64);
-
-    this.sphere = new THREE.Group() as unknown as THREE.Mesh;
-
-    const wallMesh = new THREE.Mesh(cylinder, this.material);
-    (this.sphere as unknown as THREE.Group).add(wallMesh);
-
-    // Top and bottom caps (solid black to block outside)
-    const capMat = new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      transparent: true,
-      depthWrite: false,
-      depthTest: false,
-      side: THREE.BackSide,
-    });
-    const topCap = new THREE.Mesh(capGeo, capMat);
-    topCap.position.y = 10;
-    topCap.rotation.x = Math.PI / 2;
-    (this.sphere as unknown as THREE.Group).add(topCap);
-
-    const bottomCap = new THREE.Mesh(capGeo.clone(), capMat);
-    bottomCap.position.y = -10;
-    bottomCap.rotation.x = -Math.PI / 2;
-    (this.sphere as unknown as THREE.Group).add(bottomCap);
-
+    // Big sphere around the camera
+    const geo = new THREE.SphereGeometry(4, 32, 32);
+    this.sphere = new THREE.Mesh(geo, this.material);
     this.sphere.renderOrder = 9999;
-    wallMesh.renderOrder = 9999;
-    topCap.renderOrder = 9999;
-    bottomCap.renderOrder = 9999;
     this.sphere.visible = false;
   }
 
-  /**
-   * Start the wormhole transition. Fades in the video sphere.
-   * Returns immediately — does not block.
-   *
-   * If a previous transition is still active (e.g. stuck), it is
-   * force-ended first so we never deadlock.
-   */
+  setTargetEra(era: Era): void {
+    this.targetEra = era;
+  }
+
   start(): void {
     if (this.active) {
-      console.warn("[Wormhole] start() called while active — force-ending previous transition");
       this.forceEnd();
     }
 
     this.generation++;
     this.active = true;
     this.splatReady = false;
-    this.opacity = 0;
-    this.targetOpacity = 0;
-    this.fadeStartOpacity = 0;
-    this.fadeStartTime = 0;
+    this.phase = "flash-in";
+    this.phaseStart = performance.now();
     this.resolveTransition = null;
+
+    // Set era color
+    const eraColor = WORLDS[this.targetEra]?.color ?? 0xffffff;
+    this.material.uniforms.color.value.setHex(eraColor);
+    this.material.uniforms.opacity.value = 0;
+    this.material.uniforms.progress.value = 0;
+
     this.sphere.visible = true;
     this.scene.add(this.sphere);
-    this.playStartTime = performance.now();
 
-    this.video.currentTime = 0;
-    this.video.playbackRate = 4.0;
-    this.video.play().catch((err) => {
-      console.warn("[Wormhole] Video play failed:", err);
-      // Even if video fails we proceed — the sphere shows black which is
-      // acceptable as a transition screen.
-    });
-
-    this.fadeToOpacity(1);
-    console.log("[Wormhole] Started (generation=" + this.generation + ")");
+    console.log("[Wormhole] Flash started (generation=" + this.generation + ")");
   }
 
-  /**
-   * Signal that the new splat is loaded. The wormhole will fade out
-   * after the minimum display time has passed.
-   */
   signalSplatReady(): void {
-    if (!this.active) {
-      console.warn("[Wormhole] signalSplatReady() called while not active — ignoring");
-      return;
-    }
+    if (!this.active) return;
     this.splatReady = true;
     console.log("[Wormhole] Splat ready");
-    this.tryFadeOut();
+    this.tryFlashOut();
   }
 
-  /**
-   * Returns a promise that resolves when the wormhole has fully faded out.
-   * Safe to call even if finish() already ran (resolves immediately).
-   */
   waitForComplete(): Promise<void> {
     if (!this.active) return Promise.resolve();
     return new Promise((resolve) => {
-      // If there was a previous resolve callback that was never called
-      // (shouldn't happen, but be safe), resolve it now to avoid leaked promises.
       if (this.resolveTransition) {
         const old = this.resolveTransition;
         this.resolveTransition = null;
@@ -182,80 +121,98 @@ export class WormholeTransition {
     });
   }
 
-  /**
-   * Returns true once fully opaque (fade-in done). Use this to know
-   * when it's safe to unload the old splat.
-   */
   isFullyOpaque(): boolean {
-    return this.active && this.opacity >= 0.99;
+    return this.active && this.phase !== "flash-in" && this.material.uniforms.opacity.value >= 0.95;
   }
 
   isActive(): boolean {
     return this.active;
   }
 
-  /**
-   * Must be called every frame (driven by the system's update loop).
-   */
   tick(camera: THREE.Camera): void {
     if (!this.active) return;
 
     this.sphere.position.copy(camera.position);
 
-    // Animate opacity
     const now = performance.now();
-    const elapsed = now - this.fadeStartTime;
-    const t = Math.min(elapsed / FADE_DURATION_MS, 1);
-    this.opacity = this.fadeStartOpacity + (this.targetOpacity - this.fadeStartOpacity) * t;
-    this.material.uniforms.opacity.value = this.opacity;
+    const elapsed = now - this.phaseStart;
 
-    // Update video texture
-    if (this.video.readyState >= this.video.HAVE_CURRENT_DATA) {
-      this.texture.needsUpdate = true;
-    }
+    switch (this.phase) {
+      case "flash-in": {
+        const t = Math.min(elapsed / FLASH_IN_MS, 1);
+        // Ease-in: accelerating flash
+        const eased = t * t;
+        this.material.uniforms.opacity.value = eased;
+        this.material.uniforms.progress.value = t * 0.3;
 
-    // Check if fade-out is complete
-    if (this.targetOpacity === 0 && this.opacity <= 0.01 && t >= 1) {
-      this.finish();
+        if (t >= 1) {
+          this.phase = "hold";
+          this.phaseStart = now;
+        }
+        break;
+      }
+
+      case "hold": {
+        // Full brightness, slowly shift toward era color
+        this.material.uniforms.opacity.value = 1.0;
+        const holdT = Math.min(elapsed / 1000, 1);
+        this.material.uniforms.progress.value = 0.3 + holdT * 0.7;
+        break;
+      }
+
+      case "flash-out": {
+        const t = Math.min(elapsed / FLASH_OUT_MS, 1);
+        // Ease-out: decelerating fade
+        const eased = 1 - (1 - t) * (1 - t);
+        this.material.uniforms.opacity.value = 1.0 - eased;
+        this.material.uniforms.progress.value = 1.0;
+
+        if (t >= 1) {
+          this.finish();
+        }
+        break;
+      }
     }
   }
 
-  private tryFadeOut(): void {
-    if (!this.active) return;
-    if (!this.splatReady) return;
+  private tryFlashOut(): void {
+    if (!this.active || !this.splatReady) return;
 
     const gen = this.generation;
-    const elapsed = performance.now() - this.playStartTime;
-    if (elapsed < MIN_DISPLAY_MS) {
-      // Wait for minimum display time — guarded by generation counter
+    const elapsed = performance.now() - this.phaseStart;
+
+    // If still in flash-in, wait until hold phase
+    if (this.phase === "flash-in") {
       setTimeout(() => {
-        if (this.generation !== gen) return; // stale timer, abort
-        this.tryFadeOut();
-      }, MIN_DISPLAY_MS - elapsed);
+        if (this.generation !== gen) return;
+        this.tryFlashOut();
+      }, 50);
       return;
     }
 
-    console.log("[Wormhole] Fading out");
-    this.fadeToOpacity(0);
-  }
+    // Ensure minimum display time
+    const totalElapsed = performance.now() - (this.phaseStart - (this.phase === "hold" ? FLASH_IN_MS : 0));
+    if (totalElapsed < MIN_DISPLAY_MS) {
+      setTimeout(() => {
+        if (this.generation !== gen) return;
+        this.tryFlashOut();
+      }, MIN_DISPLAY_MS - totalElapsed);
+      return;
+    }
 
-  private fadeToOpacity(target: number): void {
-    this.fadeStartTime = performance.now();
-    this.fadeStartOpacity = this.opacity;
-    this.targetOpacity = target;
+    console.log("[Wormhole] Flashing out");
+    this.phase = "flash-out";
+    this.phaseStart = performance.now();
   }
 
   private finish(): void {
-    if (!this.active) return; // guard against double-finish
+    if (!this.active) return;
 
     this.active = false;
     this.splatReady = false;
+    this.phase = "done";
     this.sphere.visible = false;
     this.scene.remove(this.sphere);
-    this.video.pause();
-    this.opacity = 0;
-    this.targetOpacity = 0;
-    this.fadeStartOpacity = 0;
     this.material.uniforms.opacity.value = 0;
     console.log("[Wormhole] Complete (generation=" + this.generation + ")");
 
@@ -266,11 +223,6 @@ export class WormholeTransition {
     }
   }
 
-  /**
-   * Immediately kill the transition — reset ALL state so it can be reused.
-   * This is the nuclear option: resolves any pending promise, stops the
-   * video, hides the sphere, and clears every flag.
-   */
   forceEnd(): void {
     console.warn("[Wormhole] Force-ended (generation=" + this.generation + ")");
     this.finish();
@@ -278,9 +230,6 @@ export class WormholeTransition {
 
   dispose(): void {
     this.forceEnd();
-    this.video.pause();
-    this.video.src = "";
-    this.texture.dispose();
     this.material.dispose();
     this.sphere.geometry.dispose();
   }
