@@ -9,7 +9,7 @@ import { GaussianSplatAnimator } from "./gaussianSplatAnimator.js";
 // ------------------------------------------------------------
 // Constants & Types
 // ------------------------------------------------------------
-const LOAD_TIMEOUT_MS = 30_000;
+const LOAD_TIMEOUT_MS = 120_000;
 
 interface SplatInstance {
   splat: SplatMesh;
@@ -61,6 +61,9 @@ export class GaussianSplatLoaderSystem extends createSystem({
   // Initialization
   // ----------------------------------------------------------
   init() {
+    const isMobile = /Android|Pico|Quest|OculusBrowser/i.test(
+      navigator.userAgent,
+    );
     const spark = new SparkRenderer({
       renderer: this.world.renderer,
       enableLod: true,
@@ -247,13 +250,15 @@ export class GaussianSplatLoaderSystem extends createSystem({
 
     // Render splats behind UI panels (which use AlwaysDepth + high renderOrder)
     splat.renderOrder = -10;
+    // Prevent splat from blocking controller raycasts to UI panels
+    splat.raycast = () => { };
     parent.add(splat);
     if (collider) parent.add(collider);
 
     this.instances.set(entity.index, { splat, collider, animator });
     console.log(
       `[GaussianSplatLoader] Loaded splat for entity ${entity.index}` +
-        `${collider ? " (with collider)" : ""}`,
+      `${collider ? " (with collider)" : ""}`,
     );
 
     if (animate) {
@@ -335,7 +340,7 @@ export class GaussianSplatLoaderSystem extends createSystem({
   // ----------------------------------------------------------
   setPaused(paused: boolean): void {
     if (!this.sparkRenderer) return;
-    
+
     if (paused) {
       // Option 2: Freeze the splats in place (stop sorting/updating)
       // They remain visible, but don't eat CPU/GPU cycles for updates

@@ -6,6 +6,7 @@ import {
   LocomotionEnvironment,
   Mesh,
   MeshBasicMaterial,
+  PanelDocument,
   PanelUI,
   PlaneGeometry,
   ScreenSpace,
@@ -45,6 +46,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 })
   .then((world) => {
     world.camera.position.set(0, 1.5, 0);
+
     world.scene.background = new THREE.Color(0x000000);
     world.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
@@ -124,6 +126,34 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
         width: "40%",
       });
     panelEntity.object3D!.position.set(0, 1.29, -1.9);
+
+    // In XR: remove ScreenSpace and re-parent the UIKitDocument back to
+    // the panel entity so the raycaster can find it. Without this, the
+    // document stays under the camera (where ScreenSpaceUISystem put it)
+    // and controller rays never intersect it.
+    world.visibilityState.subscribe((state) => {
+      if (state === VisibilityState.NonImmersive) {
+        if (!panelEntity.hasComponent(ScreenSpace)) {
+          panelEntity.addComponent(ScreenSpace, {
+            top: "30%",
+            bottom: "30%",
+            left: "30%",
+            right: "30%",
+            height: "40%",
+            width: "40%",
+          });
+        }
+      } else {
+        if (panelEntity.hasComponent(ScreenSpace)) {
+          panelEntity.removeComponent(ScreenSpace);
+        }
+        // Re-parent UIKitDocument from camera back to panel entity
+        const doc = PanelDocument.data.document[panelEntity.index];
+        if (doc && doc.parent !== panelEntity.object3D) {
+          panelEntity.object3D!.add(doc);
+        }
+      }
+    });
   })
   .catch((err) => {
     console.error("[World] Failed to create the IWSDK world:", err);
