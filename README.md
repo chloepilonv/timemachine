@@ -4,6 +4,17 @@ Travel through time at the San Francisco Ferry Building — explore the same loc
 
 Built for Pico headsets. Also works in any WebXR-capable browser with the included headset simulator.
 
+## Architecture
+
+![Time Machine Pipeline](architecture.jpg)
+
+## Screenshots
+
+| Past (1920s) | Present | Future (2150) |
+|:---:|:---:|:---:|
+| ![Past 1](screenshots/screenshot_past1_timemachine.png) | ![Present](screenshots/screenshot_present_timemachine.png) | ![Future 1](screenshots/screenshot_future1_timemachine.png) |
+| ![Past 2](screenshots/screenshot_past2_timemachine.png) | | ![Future 2](screenshots/screenshot_future2_timemachine.png) |
+
 ## How It Works
 
 Three Gaussian splat worlds (generated via [World Labs Marble](https://marble.worldlabs.ai/)) are loaded into a WebXR scene using [SparkJS](https://sparkjs.dev/) and [IWSDK](https://elixrjs.io/). A spatial UI panel lets you switch between eras with animated fly-in/fly-out transitions.
