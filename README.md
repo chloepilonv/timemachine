@@ -284,8 +284,11 @@ timemachine_webxr/
 │   ├── extract_tiles.py     # Google Street View -> perspective tiles
 │   ├── generate_past.py     # tiles_present -> tiles_past via Gemini
 │   ├── generate_future.py   # tiles_present -> tiles_future via Gemini
-│   └── create_world.py      # Tiles -> World Labs 3D world
+│   ├── create_world.py      # Tiles -> World Labs 3D world
+│   └── generate_architecture.py # Gemini Imagen pipeline diagram generator
 ├── prompts/                 # Gemini prompts for time period transforms
+├── screenshots/             # Era screenshots for README
+├── architecture.jpg         # Pipeline diagram (Gemini-generated)
 ├── vite.config.ts           # Vite + IWSDK plugins
 └── package.json
 ```

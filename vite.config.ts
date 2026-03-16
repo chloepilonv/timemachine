@@ -59,6 +59,9 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 8081,
     open: true,
+    headers: {
+      "Cache-Control": "no-store",
+    },
     https: fs.existsSync(path.resolve(__dirname, ".key.pem"))
       ? {
           key: fs.readFileSync(path.resolve(__dirname, ".key.pem")),

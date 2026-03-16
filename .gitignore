@@ -159,3 +159,9 @@ tiles_past/
 tiles_future/
 ref_images/
 panoramas/
+
+# Local reference files
+reference/
+
+# Runtime output
+generated_worlds.txt
