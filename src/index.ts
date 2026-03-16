@@ -160,7 +160,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       const inVR = state !== VisibilityState.NonImmersive;
       splatEntity.object3D!.position.y = inVR ? VR_SCENE_LIFT : 0;
       if (agentMesh) {
-        const y = inVR ? VR_SCENE_LIFT + 0.6 : 0.6;
+        const y = inVR ? VR_SCENE_LIFT + 1.0 : 0.6;
         agentMesh.position.y = y;
         import("./convaiAgent.js").then(({ convaiAgent }) => { (convaiAgent as any).baseY = y; });
       }
