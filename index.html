@@ -201,6 +201,62 @@
       }
       .talk-floating.visible { display: block; }
 
+      /* Voice prompt */
+      #voice-prompt {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 28px;
+        border: 1px solid rgba(220, 140, 50, 0.3);
+        border-radius: 12px;
+        background: rgba(20, 18, 14, 0.7);
+        z-index: 1;
+        min-width: 300px;
+      }
+      #voice-prompt .mic {
+        font-size: 1.4rem;
+        animation: mic-pulse 1s ease-in-out infinite;
+      }
+      @keyframes mic-pulse {
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 1; }
+      }
+      #voice-prompt .mic.done {
+        animation: none;
+        opacity: 0.3;
+      }
+      #voice-prompt .text {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(0.7rem, 2vw, 0.95rem);
+        color: #ffffff;
+        letter-spacing: 0.05em;
+        min-height: 1.2em;
+      }
+      #voice-prompt .cursor {
+        display: inline-block;
+        width: 2px;
+        height: 1em;
+        background: #ffffff;
+        margin-left: 2px;
+        animation: blink 0.6s step-end infinite;
+        vertical-align: text-bottom;
+      }
+      @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+      #voice-prompt.hidden { display: none; }
+
+      #gen-status {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(0.6rem, 1.5vw, 0.75rem);
+        color: #e8a050;
+        letter-spacing: 0.15em;
+        z-index: 1;
+        opacity: 0;
+        transition: opacity 0.5s;
+      }
+      #gen-status.visible { opacity: 1; }
     </style>
   </head>
   <body style="margin: 0">
@@ -208,13 +264,69 @@
     <div id="main-menu">
       <h1>TIME MACHINE</h1>
 
-      <div id="loading-status" class="subtitle" style="margin-top: 8px;">Loading world...</div>
-      <div id="loading-bar-container">
+      <!-- Fake voice prompt -->
+      <div id="voice-prompt">
+        <span class="mic">🎙️</span>
+        <span class="text" id="prompt-text"><span class="cursor"></span></span>
+      </div>
+      <div id="gen-status"></div>
+
+      <div id="loading-status" class="subtitle" style="margin-top: 8px; display: none;">Loading world...</div>
+      <div id="loading-bar-container" style="display: none;">
         <div id="loading-bar"></div>
       </div>
       <button id="enter-btn" class="menu-btn" disabled style="display: none;">Loading...</button>
       <button id="menu-talk-btn" class="menu-btn" style="display:none">Start Talking to Agent</button>
     </div>
+
+    <script>
+      (function() {
+        const phrase = "Take me to the SF Ferry Building";
+        const textEl = document.getElementById("prompt-text");
+        const genStatus = document.getElementById("gen-status");
+        const loadingStatus = document.getElementById("loading-status");
+        const loadingBar = document.getElementById("loading-bar-container");
+        const mic = document.querySelector("#voice-prompt .mic");
+        let i = 0;
+
+        // Typewriter effect
+        function typeNext() {
+          if (i < phrase.length) {
+            textEl.innerHTML = phrase.slice(0, i + 1) + '<span class="cursor"></span>';
+            i++;
+            setTimeout(typeNext, 60 + Math.random() * 40);
+          } else {
+            // Done typing
+            textEl.innerHTML = phrase;
+            mic.classList.add("done");
+            setTimeout(showGenerating, 800);
+          }
+        }
+
+        function showGenerating() {
+          genStatus.textContent = "GENERATING WORLD...";
+          genStatus.classList.add("visible");
+          setTimeout(() => {
+            genStatus.textContent = "FETCHING GOOGLE MAPS 3D TILES...";
+          }, 1500);
+          setTimeout(() => {
+            genStatus.textContent = "CREATING GAUSSIAN SPLAT WITH WORLD LABS...";
+          }, 3500);
+          setTimeout(() => {
+            genStatus.textContent = "BUILDING PAST · PRESENT · FUTURE...";
+          }, 5500);
+          setTimeout(() => {
+            // Show loading bar
+            loadingStatus.style.display = "";
+            loadingBar.style.display = "";
+            genStatus.classList.remove("visible");
+          }, 7000);
+        }
+
+        // Start after delay so user can click "Enter VR" first
+        setTimeout(typeNext, 6000);
+      })();
+    </script>
 
     <!-- Persistent talk button — stays visible after menu dismissal (desktop only) -->
     <button id="talk-btn-persistent" class="talk-floating">Talk to Agent</button>
